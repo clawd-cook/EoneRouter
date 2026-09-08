@@ -23,6 +23,8 @@ which node       # must be $HOME/.nvm/versions/node/v24.20.0/bin/node
 
 If `node -v` is not `v24.20.0`, **stop**. Do not fall back.
 
+`nvm use 24.20.0` in the **current shell** is required and does not need extra confirmation. Do **not** change nvm’s default alias, install another Node, or edit shell rc files to make 24 global.
+
 ### Do not use
 
 - Homebrew Node (`/opt/homebrew/bin/node`, currently newer than 24)
@@ -32,6 +34,22 @@ If `node -v` is not `v24.20.0`, **stop**. Do not fall back.
 - Changing `.node-version` or introducing a second runtime
 
 `nvm use` without a version fails here: this repo has `.node-version`, not `.nvmrc`. Always pass `24.20.0`.
+
+## High-risk operations (ask first)
+
+**Stop and get an explicit yes from the user** before any operation that changes the machine outside this repository. Do not proceed on implied consent, “it would help”, or because a skill/docs suggested it.
+
+Requires confirmation:
+
+- **Global package installs** — `npm i -g`, `pnpm add -g`, `yarn global`, `bun add -g`, `brew install` / `brew upgrade`, OS package managers, editor/CLI plugins installed for all projects
+- **Global or extra-repo deletes** — anything outside the checkout: `~/.nvm`, Homebrew prefixes, `/usr/local`, `/opt/homebrew`, other clones, shell history, credentials, nvm versions, `rm -rf` on home or system paths
+- **Global environment switches** — `nvm alias default`, `nvm install`, `nvm uninstall`, changing default Node, editing `~/.zshrc` / `~/.bashrc` / `~/.zprofile`, mutating `PATH` persistently, Docker/context switches, logging into cloud CLIs
+- **Destructive git/machine actions** — `git push --force`, hard reset of shared branches, rewriting git config, skipping hooks
+- **Secrets and identity** — writing credentials, SSH keys, tokens, or changing git `user.*`
+
+How to ask: state the exact command, what it changes (path + scope), why you think it is needed, and a repo-local alternative if one exists (`pnpm add -D`, `pnpm dlx`, `pnpm exec`). Wait for a clear yes. If the user says no or does not answer, skip it and continue with in-repo tools only.
+
+Prefer in-repo, session-local work: `pnpm add` / `pnpm add -D`, `pnpm dlx`, `pnpm exec`, and `nvm use 24.20.0` in this shell.
 
 ## Project Overview
 
