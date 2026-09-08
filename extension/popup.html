@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EoneRouter</title>
+    <style>
+      body {
+        box-sizing: border-box;
+        width: 320px;
+        margin: 0;
+        padding: 16px;
+        color: #172033;
+        font-family: system-ui, sans-serif;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: 18px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 12px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #b8c0cc;
+        border-radius: 6px;
+        font: inherit;
+        font-weight: 400;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      button {
+        padding: 8px 14px;
+        border: 1px solid #7a8494;
+        border-radius: 6px;
+        background: #fff;
+        cursor: pointer;
+        font: inherit;
+      }
+
+      #save {
+        border-color: #2458d3;
+        background: #2458d3;
+        color: #fff;
+      }
+
+      #status {
+        min-height: 20px;
+        margin: 12px 0 0;
+        color: #b42318;
+        font-size: 13px;
+      }
+
+      #status[data-ok="true"] {
+        color: #167044;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>EoneRouter</h1>
+    <form id="settings">
+      <label>
+        Origin
+        <input id="origin" name="origin" type="url" required />
+      </label>
+      <label>
+        标识
+        <input id="id" name="id" type="text" placeholder="eone-xxxx" />
+      </label>
+      <div class="actions">
+        <button id="save" type="button">保存</button>
+        <button id="clear" type="button">清空</button>
+      </div>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
