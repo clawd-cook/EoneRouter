@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test --experimental-strip-types lib/eone/*.test.ts"
+    "test": "node --test --experimental-strip-types lib/eone/*.test.ts extension/dnr.test.mjs"
   },
   "dependencies": {
     "next": "16.2.9",
