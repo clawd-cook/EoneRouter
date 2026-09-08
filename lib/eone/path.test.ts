@@ -45,7 +45,10 @@ test("maps / to index.html", () => {
   });
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.absolutePath, path.join(storageRoot, "eone-1", "index.html"));
+    assert.equal(
+      result.absolutePath,
+      fs.realpathSync(path.join(storageRoot, "eone-1", "index.html")),
+    );
   }
 });
 
@@ -58,7 +61,10 @@ test("maps /index.js to that file", () => {
   });
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.absolutePath, path.join(storageRoot, "eone-1", "index.js"));
+    assert.equal(
+      result.absolutePath,
+      fs.realpathSync(path.join(storageRoot, "eone-1", "index.js")),
+    );
   }
 });
 

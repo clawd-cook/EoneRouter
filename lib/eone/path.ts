@@ -84,5 +84,5 @@ export function resolvePackageFile(input: {
     return { ok: false, reason: "not-a-file" };
   }
 
-  return { ok: true, absolutePath: candidate };
+  return { ok: true, absolutePath: realFile };
 }
