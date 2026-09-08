@@ -104,8 +104,11 @@ Stack:
 Layout:
 
 - `app/` — routes, layout, global CSS
+- `extension/` — unpacked Chrome Manifest V3 extension
+- `lib/eone/` — request classification and static package helpers
 - `public/` — static assets
-- `strorage/` — static HTML fixtures (`eone-1`, `eone-2`); keep the folder name as-is
+- `storage/` — static HTML fixtures (`eone-1`, `eone-2`)
+- `proxy.ts` — request rewrites based on `X-Eone-Id`
 - `.agents/skills/` — local agent skills; not application source
 - `pnpm-workspace.yaml` — pnpm native-build allowlist (`allowBuilds` / `ignoredBuiltDependencies`), **not** a workspace package list
 
@@ -129,6 +132,7 @@ Do not run `npm install`, `yarn`, or `bun install`.
 ```bash
 nvm use 24.20.0
 pnpm dev          # next dev — http://localhost:3000
+pnpm test         # node:test for lib/eone and extension/dnr.test.mjs
 pnpm build        # next build
 pnpm start        # next start (after build)
 pnpm lint         # eslint
@@ -141,14 +145,16 @@ There is no `.env` template. Do not commit `.env*` (gitignored).
 
 ## Testing Instructions
 
-No test runner or `test` script is configured. Do not invent Jest/Vitest/Playwright until the project adds them.
+`pnpm test` runs `node:test` for `lib/eone` and `extension/dnr.test.mjs`.
+Do not invent Jest/Vitest/Playwright unless the project adds them.
 
-Until then, verify changes with:
+Verify changes with:
 
-1. `pnpm exec tsc --noEmit`
-2. `pnpm lint` for app code (see caveat below)
-3. `pnpm build` when the change can affect production output
-4. For UI/route/RSC behavior, follow **next-dev-loop** (see Required skills). Do not treat typecheck alone as runtime proof.
+1. `pnpm test`
+2. `pnpm exec tsc --noEmit`
+3. `pnpm lint` for app code (see caveat below)
+4. `pnpm build` when the change can affect production output
+5. For UI/route/RSC behavior, follow **next-dev-loop** (see Required skills). Do not treat typecheck alone as runtime proof.
 
 When adding tests, colocate them with the code or under a `tests/` directory and add a `package.json` script. Do not place tests under `.agents/`.
 
@@ -194,5 +200,5 @@ Output lives in `.next/` (gitignored). No Dockerfile, no GitHub Actions yet. Do 
 ## Additional Notes
 
 - Default Homebrew `node` on PATH may be **not** 24. Always activate nvm 24.20.0 in the same shell as pnpm/next.
-- `strorage/` is intentional spelling in this repo; do not rename it in passing.
+- Static package fixtures use the `storage/` spelling.
 - Skills live under `.agents/skills/`. Do not edit them unless the task is about the skills themselves.
