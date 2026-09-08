@@ -7,12 +7,16 @@ export function proxy(request: NextRequest) {
   const result = classifyRequest(request.nextUrl.pathname, header);
 
   if (result.action === "skip" || result.action === "pass") {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set("Vary", "X-Eone-Id");
+    return response;
   }
 
   const url = request.nextUrl.clone();
   url.pathname = result.target;
-  return NextResponse.rewrite(url);
+  const response = NextResponse.rewrite(url);
+  response.headers.set("Vary", "X-Eone-Id");
+  return response;
 }
 
 export const config = {

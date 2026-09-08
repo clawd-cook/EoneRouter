@@ -104,6 +104,7 @@ Stack:
 Layout:
 
 - `app/` — routes, layout, global CSS
+- `app/%5F_eone/` — `%5F_eone` is Next’s escaped underscore so public URLs remain `/__eone/...`; renaming it to `__eone` unregisters the routes.
 - `extension/` — unpacked Chrome Manifest V3 extension
 - `lib/eone/` — request classification and static package helpers
 - `public/` — static assets

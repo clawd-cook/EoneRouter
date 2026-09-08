@@ -1,11 +1,21 @@
-import { buildDnrRule, DNR_RULE_ID, DEFAULT_ORIGIN } from "./dnr.mjs";
+import {
+  buildDnrRule,
+  DNR_RULE_ID,
+  DEFAULT_ORIGIN,
+  hostPermissionPattern,
+} from "./dnr.mjs";
 
 async function rebuild() {
   const { origin, id } = await chrome.storage.local.get({
     origin: DEFAULT_ORIGIN,
     id: "",
   });
-  const rule = id ? buildDnrRule({ origin, id }) : null;
+  const hasPermission =
+    id &&
+    (await chrome.permissions.contains({
+      origins: [hostPermissionPattern(origin)],
+    }));
+  const rule = hasPermission ? buildDnrRule({ origin, id }) : null;
   await chrome.declarativeNetRequest.updateDynamicRules({
     removeRuleIds: [DNR_RULE_ID],
     addRules: rule ? [rule] : [],
@@ -25,6 +35,10 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onStartup.addListener(() => {
+  void rebuildSafely();
+});
+
+chrome.permissions.onAdded.addListener(() => {
   void rebuildSafely();
 });
 

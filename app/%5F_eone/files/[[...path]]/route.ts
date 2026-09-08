@@ -2,6 +2,7 @@ import { servePackage } from "@/lib/eone/serve";
 import { getStorageRoot } from "@/lib/eone/storage-root";
 import { NextResponse } from "next/server";
 
+// %5F_eone escapes Next's private-folder underscore while keeping /__eone public URLs.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 

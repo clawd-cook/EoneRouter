@@ -45,6 +45,7 @@ saveButton.addEventListener("click", async () => {
 
   try {
     if (id) {
+      await chrome.storage.local.set({ origin, id });
       const granted = await chrome.permissions.request({
         origins: [hostPermissionPattern(origin)],
       });
@@ -54,7 +55,9 @@ saveButton.addEventListener("click", async () => {
       }
     }
 
-    await chrome.storage.local.set({ origin, id });
+    if (!id) {
+      await chrome.storage.local.set({ origin, id });
+    }
     await applyRule();
     originInput.value = origin;
     setStatus("已保存", true);
