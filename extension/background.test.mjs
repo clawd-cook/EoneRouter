@@ -10,6 +10,7 @@ let proxySettingsValue = { mode: "system" };
 const state = {
   origin: "http://xxx.jd.com",
   id: "eone-1",
+  platformProxy: "127.0.0.1:3001",
   previousProxy: { mode: "system" },
   pacActive: false,
 };
@@ -118,6 +119,7 @@ test("skip PAC for local platform origin", async () => {
   granted = true;
   state.origin = "http://localhost:3001";
   state.id = "eone-1";
+  state.platformProxy = "127.0.0.1:3001";
   state.pacActive = false;
   dnrUpdates.length = 0;
   proxySets.length = 0;
@@ -128,6 +130,35 @@ test("skip PAC for local platform origin", async () => {
     proxySets.some((s) => s.value?.mode === "pac_script"),
     false,
   );
+});
+
+test("rebuild PAC uses remote platformProxy from storage", async () => {
+  granted = true;
+  state.origin = "http://xxx.jd.com";
+  state.id = "eone-1";
+  state.platformProxy = "eone-router.jdtest.net:80";
+  state.pacActive = false;
+  proxySettingsValue = { mode: "system" };
+  proxySets.length = 0;
+
+  assert.deepEqual(await apply(), { ok: true });
+  assert.match(
+    proxySets[0].value.pacScript.data,
+    /PROXY eone-router\.jdtest\.net:80/,
+  );
+});
+
+test("empty id restores proxy but keeps platformProxy", async () => {
+  granted = false;
+  state.origin = "http://xxx.jd.com";
+  state.id = "";
+  state.platformProxy = "eone-router.jdtest.net:80";
+  state.pacActive = true;
+  state.previousProxy = { mode: "system" };
+
+  assert.deepEqual(await apply(), { ok: true });
+  assert.equal(state.platformProxy, "eone-router.jdtest.net:80");
+  assert.equal(state.pacActive, false);
 });
 
 test("empty id restores previous proxy", async () => {
