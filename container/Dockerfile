@@ -20,4 +20,5 @@ RUN curl -fsSLO --compressed ${NODE_URL} &&\
     rm -f "node-v24.14.0-linux-x64.tar.xz" &&\
     node --version && npm --version && npx --version &&\
     npm set registry http://mirrors.jd.com/npm
+    npm i pnpm@11.23.0 -g
     
