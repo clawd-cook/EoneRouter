@@ -108,13 +108,18 @@ child.on("exit", (code, signal) => {
 
 try {
   await waitForNext(internalPort, readyTimeout);
+  console.log(
+    `[eone] Next ready on 127.0.0.1:${internalPort}; binding outer on 0.0.0.0:${publicPort}`,
+  );
   await listenOnAllInterfaces(outer, publicPort);
-  console.info("[eone] listening", {
-    publicPort,
-    internalNextPort: internalPort,
-    note: "Chrome PAC must reach 127.0.0.1:" + publicPort + " on this machine",
-  });
+  console.log(
+    `[eone] listening publicPort=${publicPort} internalNextPort=${internalPort} (nginx/PAC → ${publicPort}, not ${internalPort})`,
+  );
 } catch (error) {
+  console.error(
+    `[eone] failed to listen on publicPort=${publicPort} (internalNextPort=${internalPort})`,
+    error,
+  );
   child.removeAllListeners("exit");
   await stopChildProcess(child);
   throw error;
