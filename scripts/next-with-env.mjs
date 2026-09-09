@@ -109,6 +109,11 @@ child.on("exit", (code, signal) => {
 try {
   await waitForNext(internalPort, readyTimeout);
   await listenOnAllInterfaces(outer, publicPort);
+  console.info("[eone] listening", {
+    publicPort,
+    internalNextPort: internalPort,
+    note: "Chrome PAC must reach 127.0.0.1:" + publicPort + " on this machine",
+  });
 } catch (error) {
   child.removeAllListeners("exit");
   await stopChildProcess(child);

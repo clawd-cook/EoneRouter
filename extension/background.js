@@ -5,6 +5,8 @@ import {
   DNR_SWIMLANE_RULE_ID,
   DEFAULT_ORIGIN,
   hostPermissionPattern,
+  LOCAL_PROXY_HOST,
+  LOCAL_PROXY_PORT,
   shouldSkipPac,
 } from "./dnr.mjs";
 
@@ -75,6 +77,13 @@ async function rebuildOnce() {
     (await chrome.permissions.contains({
       origins: [hostPermissionPattern(origin)],
     }));
+  console.info("[eone] rebuild", {
+    origin,
+    id: id || "(empty)",
+    hasPermission: Boolean(hasPermission),
+    skipPac: shouldSkipPac(origin),
+    pacTarget: `${LOCAL_PROXY_HOST}:${LOCAL_PROXY_PORT}`,
+  });
   const rules = hasPermission ? buildDnrRules({ origin, id }) : [];
   await chrome.declarativeNetRequest.updateDynamicRules({
     removeRuleIds: [DNR_RULE_ID, DNR_SWIMLANE_RULE_ID],
@@ -83,10 +92,16 @@ async function rebuildOnce() {
   try {
     if (hasPermission) {
       await applyPac(origin);
+      console.info("[eone] pac applied or skipped", {
+        origin,
+        skipPac: shouldSkipPac(origin),
+      });
     } else {
       await restoreBrowserProxy();
+      console.info("[eone] pac restored (no id or no host permission)");
     }
   } catch (error) {
+    console.error("[eone] pac apply failed; rolling back DNR", error);
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: [DNR_RULE_ID, DNR_SWIMLANE_RULE_ID],
       addRules: [],
@@ -100,7 +115,7 @@ async function rebuildSafely() {
   try {
     await rebuild();
   } catch (error) {
-    console.error("Failed to rebuild EoneRouter rule:", error);
+    console.error("[eone] Failed to rebuild EoneRouter rule:", error);
   }
 }
 

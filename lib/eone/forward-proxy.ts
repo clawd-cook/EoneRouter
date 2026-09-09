@@ -81,7 +81,17 @@ export function createOuterServer(input: {
   const server = http.createServer((req, res) => {
     const method = req.method ?? "GET";
     const url = req.url ?? "/";
+    const eoneId = req.headers["x-eone-id"];
     const classified = classifyIncoming(method, url);
+    console.info("[eone] outer", {
+      method,
+      url: url.length > 200 ? `${url.slice(0, 200)}…` : url,
+      action: classified.action,
+      status: classified.action === "reject" ? classified.status : undefined,
+      path:
+        classified.action === "forward" ? classified.pathAndQuery : undefined,
+      eoneId: typeof eoneId === "string" ? eoneId : eoneId?.[0] ?? null,
+    });
     if (classified.action === "reject") {
       res.statusCode = classified.status;
       res.end();
@@ -98,12 +108,22 @@ export function createOuterServer(input: {
         headers,
       },
       (proxyRes) => {
+        console.info("[eone] outer←next", {
+          method,
+          path: classified.pathAndQuery,
+          status: proxyRes.statusCode ?? 502,
+        });
         const outHeaders = filterResponseHeaders(proxyRes.headers);
         res.writeHead(proxyRes.statusCode ?? 502, outHeaders);
         proxyRes.pipe(res);
       },
     );
-    proxyReq.on("error", () => {
+    proxyReq.on("error", (err) => {
+      console.error("[eone] outer→next failed", {
+        method,
+        path: classified.pathAndQuery,
+        message: err.message,
+      });
       if (!res.headersSent) {
         res.statusCode = 502;
         res.end();
@@ -113,6 +133,7 @@ export function createOuterServer(input: {
   });
 
   server.on("connect", (_req, socket) => {
+    console.warn("[eone] outer rejected CONNECT");
     socket.write("HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\n\r\n");
     socket.destroy();
   });
