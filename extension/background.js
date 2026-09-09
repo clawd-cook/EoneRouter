@@ -1,6 +1,7 @@
 import {
-  buildDnrRule,
+  buildDnrRules,
   DNR_RULE_ID,
+  DNR_SWIMLANE_RULE_ID,
   DEFAULT_ORIGIN,
   hostPermissionPattern,
 } from "./dnr.mjs";
@@ -15,10 +16,10 @@ async function rebuild() {
     (await chrome.permissions.contains({
       origins: [hostPermissionPattern(origin)],
     }));
-  const rule = hasPermission ? buildDnrRule({ origin, id }) : null;
+  const rules = hasPermission ? buildDnrRules({ origin, id }) : [];
   await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [DNR_RULE_ID],
-    addRules: rule ? [rule] : [],
+    removeRuleIds: [DNR_RULE_ID, DNR_SWIMLANE_RULE_ID],
+    addRules: rules,
   });
 }
 

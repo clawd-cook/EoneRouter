@@ -12,7 +12,16 @@ if (existsSync(envFile)) {
 }
 
 const nextBin = resolve(process.cwd(), "node_modules/next/dist/bin/next");
-const child = spawn(process.execPath, [nextBin, ...process.argv.slice(2)], {
+const nextArgs = [...process.argv.slice(2)];
+if (
+  process.env.PORT &&
+  !nextArgs.includes("-p") &&
+  !nextArgs.includes("--port")
+) {
+  nextArgs.push("-p", process.env.PORT);
+}
+
+const child = spawn(process.execPath, [nextBin, ...nextArgs], {
   stdio: "inherit",
   env: process.env,
 });

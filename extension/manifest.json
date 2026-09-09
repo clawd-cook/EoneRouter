@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "EoneRouter",
   "version": "0.1.0",
-  "description": "Attach X-Eone-Id so the preview origin can serve a local static package.",
+  "description": "Attach X-Eone-Id and Swimlane so the preview origin and page Fetch/XHR use the selected eone id.",
   "action": {
     "default_title": "EoneRouter",
     "default_popup": "popup.html"

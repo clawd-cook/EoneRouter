@@ -63,7 +63,7 @@ test("rebuild removes the rule but does not add it without host permission", asy
 
   assert.deepEqual(await apply(), { ok: true });
   assert.deepEqual(updates, [
-    { removeRuleIds: [1], addRules: [] },
+    { removeRuleIds: [1, 2], addRules: [] },
   ]);
 });
 
@@ -73,10 +73,18 @@ test("rebuild adds the rule when host permission is granted", async () => {
 
   assert.deepEqual(await apply(), { ok: true });
   assert.equal(updates.length, 1);
-  assert.deepEqual(updates[0].removeRuleIds, [1]);
-  assert.equal(updates[0].addRules.length, 1);
+  assert.deepEqual(updates[0].removeRuleIds, [1, 2]);
+  assert.equal(updates[0].addRules.length, 2);
   assert.equal(
     updates[0].addRules[0].action.requestHeaders[0].value,
+    "eone-1",
+  );
+  assert.equal(
+    updates[0].addRules[1].action.requestHeaders[0].header,
+    "Swimlane",
+  );
+  assert.equal(
+    updates[0].addRules[1].action.requestHeaders[0].value,
     "eone-1",
   );
 });
@@ -89,5 +97,5 @@ test("permission additions trigger the same rebuild", async () => {
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(updates.length, 1);
-  assert.equal(updates[0].addRules.length, 1);
+  assert.equal(updates[0].addRules.length, 2);
 });

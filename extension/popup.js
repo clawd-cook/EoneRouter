@@ -1,7 +1,7 @@
 import {
   DEFAULT_ORIGIN,
-  hostPermissionPattern,
   normalizeOrigin,
+  requiredHostPermissions,
 } from "./dnr.mjs";
 
 const originInput = document.querySelector("#origin");
@@ -45,9 +45,8 @@ saveButton.addEventListener("click", async () => {
 
   try {
     if (id) {
-      await chrome.storage.local.set({ origin, id });
       const granted = await chrome.permissions.request({
-        origins: [hostPermissionPattern(origin)],
+        origins: requiredHostPermissions(origin),
       });
       if (!granted) {
         setStatus("未授予站点权限");
@@ -55,9 +54,7 @@ saveButton.addEventListener("click", async () => {
       }
     }
 
-    if (!id) {
-      await chrome.storage.local.set({ origin, id });
-    }
+    await chrome.storage.local.set({ origin, id });
     await applyRule();
     originInput.value = origin;
     setStatus("已保存", true);

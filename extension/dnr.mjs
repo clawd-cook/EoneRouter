@@ -1,6 +1,9 @@
 export const DNR_RULE_ID = 1;
+export const DNR_SWIMLANE_RULE_ID = 2;
 export const EONE_HEADER_NAME = "X-Eone-Id";
+export const SWIMLANE_HEADER_NAME = "Swimlane";
 export const DEFAULT_ORIGIN = "http://localhost:3000";
+export const EXTRA_HOST_PERMISSIONS = ["http://*/*", "https://*/*"];
 
 export const RESOURCE_TYPES = [
   "main_frame",
@@ -25,6 +28,10 @@ export function normalizeOrigin(origin) {
 
 export function hostPermissionPattern(origin) {
   return `${normalizeOrigin(origin)}/*`;
+}
+
+export function requiredHostPermissions(origin) {
+  return [hostPermissionPattern(origin), ...EXTRA_HOST_PERMISSIONS];
 }
 
 export function originToRegexFilter(origin) {
@@ -52,4 +59,30 @@ export function buildDnrRule({ origin, id }) {
       resourceTypes: RESOURCE_TYPES,
     },
   };
+}
+
+export function buildDnrRules({ origin, id }) {
+  const originRule = buildDnrRule({ origin, id });
+  if (!originRule) {
+    return [];
+  }
+
+  const hostname = new URL(normalizeOrigin(origin)).hostname;
+  return [
+    originRule,
+    {
+      id: DNR_SWIMLANE_RULE_ID,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [
+          { header: SWIMLANE_HEADER_NAME, operation: "set", value: id },
+        ],
+      },
+      condition: {
+        initiatorDomains: [hostname],
+        resourceTypes: ["xmlhttprequest"],
+      },
+    },
+  ];
 }

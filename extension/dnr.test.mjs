@@ -2,12 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   DNR_RULE_ID,
+  DNR_SWIMLANE_RULE_ID,
   EONE_HEADER_NAME,
   RESOURCE_TYPES,
+  SWIMLANE_HEADER_NAME,
   buildDnrRule,
+  buildDnrRules,
   hostPermissionPattern,
   normalizeOrigin,
   originToRegexFilter,
+  requiredHostPermissions,
 } from "./dnr.mjs";
 
 test("normalizeOrigin strips path and trailing slash", () => {
@@ -47,4 +51,40 @@ test("host permission pattern", () => {
     hostPermissionPattern("http://localhost:3000"),
     "http://localhost:3000/*",
   );
+});
+
+test("required host permissions include all http(s) hosts for API Swimlane", () => {
+  assert.deepEqual(requiredHostPermissions("http://localhost:3000/guide"), [
+    "http://localhost:3000/*",
+    "http://*/*",
+    "https://*/*",
+  ]);
+});
+
+test("empty id yields no rules", () => {
+  assert.deepEqual(buildDnrRules({ origin: "http://localhost:3000", id: "" }), []);
+});
+
+test("builds X-Eone-Id and Swimlane xmlhttprequest rules", () => {
+  const rules = buildDnrRules({
+    origin: "http://jdcleaning-man-web-test.web.jdtest.net",
+    id: "eone-577205",
+  });
+  assert.equal(rules.length, 2);
+
+  const [originRule, swimlaneRule] = rules;
+  assert.equal(originRule.id, DNR_RULE_ID);
+  assert.deepEqual(originRule.action.requestHeaders, [
+    { header: EONE_HEADER_NAME, operation: "set", value: "eone-577205" },
+  ]);
+
+  assert.equal(swimlaneRule.id, DNR_SWIMLANE_RULE_ID);
+  assert.equal(swimlaneRule.action.type, "modifyHeaders");
+  assert.deepEqual(swimlaneRule.action.requestHeaders, [
+    { header: SWIMLANE_HEADER_NAME, operation: "set", value: "eone-577205" },
+  ]);
+  assert.deepEqual(swimlaneRule.condition.initiatorDomains, [
+    "jdcleaning-man-web-test.web.jdtest.net",
+  ]);
+  assert.deepEqual(swimlaneRule.condition.resourceTypes, ["xmlhttprequest"]);
 });

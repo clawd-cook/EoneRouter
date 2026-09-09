@@ -50,7 +50,7 @@ globalThis.chrome = {
 
 await import("./popup.js");
 
-test("save persists the normalized origin and id before requesting permission", async () => {
+test("save requests host permission before persisting origin and id", async () => {
   calls.length = 0;
   permissionGranted = true;
   elements.get("#origin").value = "http://localhost:3000/guide";
@@ -60,18 +60,18 @@ test("save persists the normalized origin and id before requesting permission", 
 
   assert.deepEqual(calls, [
     [
-      "storage.set",
-      { origin: "http://localhost:3000", id: "eone-1" },
+      "permissions.request",
+      { origins: ["http://localhost:3000/*", "http://*/*", "https://*/*"] },
     ],
     [
-      "permissions.request",
-      { origins: ["http://localhost:3000/*"] },
+      "storage.set",
+      { origin: "http://localhost:3000", id: "eone-1" },
     ],
     ["runtime.sendMessage", { type: "eone-apply" }],
   ]);
 });
 
-test("denied permission leaves saved state but does not request a rebuild", async () => {
+test("denied permission does not persist a new id or rebuild", async () => {
   calls.length = 0;
   permissionGranted = false;
   elements.get("#origin").value = "http://localhost:3000";
@@ -81,12 +81,8 @@ test("denied permission leaves saved state but does not request a rebuild", asyn
 
   assert.deepEqual(calls, [
     [
-      "storage.set",
-      { origin: "http://localhost:3000", id: "eone-2" },
-    ],
-    [
       "permissions.request",
-      { origins: ["http://localhost:3000/*"] },
+      { origins: ["http://localhost:3000/*", "http://*/*", "https://*/*"] },
     ],
   ]);
   assert.equal(elements.get("#status").textContent, "未授予站点权限");
