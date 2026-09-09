@@ -4,6 +4,7 @@ export const EONE_HEADER_NAME = "X-Eone-Id";
 export const SWIMLANE_HEADER_NAME = "Swimlane";
 export const LOCAL_PROXY_HOST = "127.0.0.1";
 export const LOCAL_PROXY_PORT = 3001;
+export const DEFAULT_PLATFORM_PROXY = `${LOCAL_PROXY_HOST}:${LOCAL_PROXY_PORT}`;
 export const DEFAULT_ORIGIN = "http://localhost:3001";
 export const EXTRA_HOST_PERMISSIONS = ["http://*/*", "https://*/*"];
 
@@ -34,6 +35,48 @@ export function normalizeHijackOrigin(origin) {
     throw new Error("劫持 Origin 必须是 http");
   }
   return normalized;
+}
+
+export function normalizePlatformProxy(raw) {
+  const trimmed = String(raw ?? "").trim();
+  if (!trimmed) {
+    throw new Error("平台代理不能为空");
+  }
+  let hostPort = trimmed;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) {
+    let url;
+    try {
+      url = new URL(trimmed);
+    } catch {
+      throw new Error("平台代理不合法");
+    }
+    if (url.protocol !== "http:") {
+      throw new Error("平台代理只支持 http");
+    }
+    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+      throw new Error("平台代理不合法");
+    }
+    let port = url.port;
+    if (!port) {
+      const explicitPort = /^http:\/\/[^/]+:(\d+)/i.exec(trimmed);
+      if (explicitPort) {
+        port = explicitPort[1];
+      }
+    }
+    if (!port) {
+      throw new Error("平台代理必须包含端口");
+    }
+    hostPort = `${url.hostname}:${port}`;
+  }
+  const m = /^([^:\/\s]+):(\d+)$/.exec(hostPort);
+  if (!m) {
+    throw new Error("平台代理格式为 host:port");
+  }
+  const port = Number(m[2]);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("平台代理端口不合法");
+  }
+  return `${m[1]}:${port}`;
 }
 
 export function shouldSkipPac(origin) {

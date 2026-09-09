@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   DEFAULT_ORIGIN,
+  DEFAULT_PLATFORM_PROXY,
   DNR_RULE_ID,
   DNR_SWIMLANE_RULE_ID,
   EONE_HEADER_NAME,
@@ -14,6 +15,7 @@ import {
   hostPermissionPattern,
   normalizeHijackOrigin,
   normalizeOrigin,
+  normalizePlatformProxy,
   originToRegexFilter,
   pacDecision,
   requiredHostPermissions,
@@ -127,4 +129,28 @@ test("buildPacScript is evaluable and matches pacDecision", () => {
   const fn = new Function(`${script}; return FindProxyForURL;`)();
   assert.equal(fn("http://xxx.jd.com/a", "xxx.jd.com"), "PROXY 127.0.0.1:3001");
   assert.equal(fn("http://other.example/", "other.example"), "DIRECT");
+});
+
+test("DEFAULT_PLATFORM_PROXY matches local loopback 3001", () => {
+  assert.equal(DEFAULT_PLATFORM_PROXY, "127.0.0.1:3001");
+});
+
+test("normalizePlatformProxy accepts host:port and http URL", () => {
+  assert.equal(
+    normalizePlatformProxy("eone-router.jdtest.net:80"),
+    "eone-router.jdtest.net:80",
+  );
+  assert.equal(
+    normalizePlatformProxy("http://eone-router.jdtest.net:80"),
+    "eone-router.jdtest.net:80",
+  );
+  assert.equal(normalizePlatformProxy("127.0.0.1:3001"), "127.0.0.1:3001");
+});
+
+test("normalizePlatformProxy rejects bad values", () => {
+  assert.throws(() => normalizePlatformProxy(""));
+  assert.throws(() => normalizePlatformProxy("eone-router.jdtest.net"));
+  assert.throws(() => normalizePlatformProxy("https://eone-router.jdtest.net:80"));
+  assert.throws(() => normalizePlatformProxy("eone-router.jdtest.net:80/path"));
+  assert.throws(() => normalizePlatformProxy("host:abc"));
 });
