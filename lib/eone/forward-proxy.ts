@@ -1,4 +1,4 @@
-import type { IncomingHttpHeaders } from "node:http";
+import http, { type IncomingHttpHeaders } from "node:http";
 
 export type ClassifyIncoming =
   | { action: "reject"; status: 400 | 405 }
@@ -72,4 +72,50 @@ export function filterResponseHeaders(
   headers: IncomingHttpHeaders | NodeJS.Dict<string | string[] | undefined>,
 ): Record<string, string | string[]> {
   return omitDropped(headers, DROP_RESPONSE_HEADERS);
+}
+
+export function createOuterServer(input: {
+  upstreamHost: string;
+  upstreamPort: number;
+}): http.Server {
+  const server = http.createServer((req, res) => {
+    const method = req.method ?? "GET";
+    const url = req.url ?? "/";
+    const classified = classifyIncoming(method, url);
+    if (classified.action === "reject") {
+      res.statusCode = classified.status;
+      res.end();
+      return;
+    }
+    const headers = filterRequestHeaders(req.headers);
+    headers.host = `${input.upstreamHost}:${input.upstreamPort}`;
+    const proxyReq = http.request(
+      {
+        hostname: input.upstreamHost,
+        port: input.upstreamPort,
+        method,
+        path: classified.pathAndQuery,
+        headers,
+      },
+      (proxyRes) => {
+        const outHeaders = filterResponseHeaders(proxyRes.headers);
+        res.writeHead(proxyRes.statusCode ?? 502, outHeaders);
+        proxyRes.pipe(res);
+      },
+    );
+    proxyReq.on("error", () => {
+      if (!res.headersSent) {
+        res.statusCode = 502;
+        res.end();
+      }
+    });
+    req.pipe(proxyReq);
+  });
+
+  server.on("connect", (_req, socket) => {
+    socket.write("HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\n\r\n");
+    socket.destroy();
+  });
+
+  return server;
 }
