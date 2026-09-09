@@ -1,6 +1,6 @@
 import {
   DEFAULT_ORIGIN,
-  normalizeOrigin,
+  normalizeHijackOrigin,
   requiredHostPermissions,
 } from "./dnr.mjs";
 
@@ -37,9 +37,9 @@ saveButton.addEventListener("click", async () => {
   let origin;
 
   try {
-    origin = normalizeOrigin(originValue);
+    origin = normalizeHijackOrigin(originValue);
   } catch (error) {
-    setStatus(String(error));
+    setStatus(error instanceof Error ? error.message : String(error));
     return;
   }
 
@@ -67,7 +67,7 @@ clearButton.addEventListener("click", async () => {
   let origin;
 
   try {
-    origin = normalizeOrigin(originInput.value);
+    origin = normalizeHijackOrigin(originInput.value);
   } catch {
     origin = DEFAULT_ORIGIN;
   }
