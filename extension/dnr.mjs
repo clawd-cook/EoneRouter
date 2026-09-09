@@ -2,7 +2,9 @@ export const DNR_RULE_ID = 1;
 export const DNR_SWIMLANE_RULE_ID = 2;
 export const EONE_HEADER_NAME = "X-Eone-Id";
 export const SWIMLANE_HEADER_NAME = "Swimlane";
-export const DEFAULT_ORIGIN = "http://localhost:3000";
+export const LOCAL_PROXY_HOST = "127.0.0.1";
+export const LOCAL_PROXY_PORT = 3001;
+export const DEFAULT_ORIGIN = "http://localhost:3001";
 export const EXTRA_HOST_PERMISSIONS = ["http://*/*", "https://*/*"];
 
 export const RESOURCE_TYPES = [
@@ -24,6 +26,42 @@ export function normalizeOrigin(origin) {
     throw new Error("Origin must be http or https");
   }
   return url.origin;
+}
+
+export function normalizeHijackOrigin(origin) {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized.startsWith("http:")) {
+    throw new Error("劫持 Origin 必须是 http");
+  }
+  return normalized;
+}
+
+export function shouldSkipPac(origin) {
+  const normalized = normalizeOrigin(origin);
+  return (
+    normalized === "http://localhost:3001" ||
+    normalized === "http://127.0.0.1:3001"
+  );
+}
+
+export function pacDecision(url, hijackOrigin) {
+  const origin = normalizeHijackOrigin(hijackOrigin);
+  if (url === origin || url.startsWith(`${origin}/`)) {
+    return `PROXY ${LOCAL_PROXY_HOST}:${LOCAL_PROXY_PORT}`;
+  }
+  return "DIRECT";
+}
+
+export function buildPacScript(hijackOrigin) {
+  const origin = normalizeHijackOrigin(hijackOrigin);
+  return `function FindProxyForURL(url, host) {
+  var origin = ${JSON.stringify(origin)};
+  if (url === origin || url.indexOf(origin + "/") === 0) {
+    return "PROXY ${LOCAL_PROXY_HOST}:${LOCAL_PROXY_PORT}";
+  }
+  return "DIRECT";
+}
+`;
 }
 
 export function hostPermissionPattern(origin) {
