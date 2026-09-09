@@ -11,6 +11,6 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["storage", "declarativeNetRequestWithHostAccess"],
+  "permissions": ["storage", "declarativeNetRequestWithHostAccess", "proxy"],
   "optional_host_permissions": ["http://*/*", "https://*/*"]
 }
