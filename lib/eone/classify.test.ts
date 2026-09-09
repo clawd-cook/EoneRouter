@@ -33,6 +33,16 @@ test("skips _next and __eone prefixes", () => {
   assert.deepEqual(classifyRequest("/__eone/invalid", null), {
     action: "skip",
   });
+  assert.deepEqual(classifyRequest("/__eone/admin", "eone-1"), {
+    action: "skip",
+  });
+  assert.deepEqual(classifyRequest("/__eone/admin/packages", "eone-1"), {
+    action: "skip",
+  });
+  assert.deepEqual(
+    classifyRequest("/__eone/admin/packages/eone-1", "eone-2"),
+    { action: "skip" },
+  );
 });
 
 test("passes through when header is missing or empty", () => {
