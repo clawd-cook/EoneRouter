@@ -135,6 +135,38 @@ test("createPackage does not replace an empty destination created during staging
   }
 });
 
+test("createPackage removes its empty destination claim when publication fails", () => {
+  const root = makeRoot();
+  const dest = path.join(root, "eone-failed");
+  const sibling = path.join(root, "eone-sibling");
+  fs.mkdirSync(sibling);
+  fs.writeFileSync(path.join(sibling, "index.html"), "keep");
+  const originalRenameSync = fs.renameSync;
+  fs.renameSync = function () {
+    const error = new Error("forced rename failure") as NodeJS.ErrnoException;
+    error.code = "EIO";
+    throw error;
+  } as typeof fs.renameSync;
+
+  try {
+    const result = createPackage(root, "eone-failed", [
+      { relativePath: "site/index.html", bytes: new TextEncoder().encode("new") },
+    ]);
+    assert.deepEqual(result, { ok: false, code: "write-failed" });
+    assert.equal(fs.existsSync(dest), false);
+    assert.deepEqual(
+      fs.readdirSync(root).filter((name) => name.startsWith(".tmp-")),
+      [],
+    );
+    assert.equal(
+      fs.readFileSync(path.join(sibling, "index.html"), "utf8"),
+      "keep",
+    );
+  } finally {
+    fs.renameSync = originalRenameSync;
+  }
+});
+
 test("createPackage returns write-failed when storage root is a file", () => {
   const parent = makeRoot();
   const root = path.join(parent, "storage-file");

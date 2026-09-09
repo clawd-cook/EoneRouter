@@ -77,6 +77,7 @@ export function createPackage(
   const dest = path.join(storageRoot, id);
   const tmpDir = path.join(storageRoot, `.tmp-${randomUUID()}`);
   let tmpCreated = false;
+  let destClaimed = false;
   let publishing = false;
   try {
     fs.mkdirSync(storageRoot, { recursive: true });
@@ -98,11 +99,19 @@ export function createPackage(
     }
     publishing = true;
     fs.mkdirSync(dest);
+    destClaimed = true;
     fs.renameSync(tmpDir, dest);
     return { ok: true, id };
   } catch (err) {
     if (tmpCreated) {
       removeDir(tmpDir);
+    }
+    if (destClaimed) {
+      try {
+        fs.rmdirSync(dest);
+      } catch {
+        // Preserve a destination that another writer populated.
+      }
     }
     if (publishing && (err as NodeJS.ErrnoException).code === "EEXIST") {
       return { ok: false, code: "package-exists" };
