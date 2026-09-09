@@ -1,3 +1,5 @@
+import type { Server } from "node:net";
+
 export function stripPortFlags(args: string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < args.length; i += 1) {
@@ -23,4 +25,33 @@ export function internalNextArgs(
     "-p",
     String(internalPort),
   ];
+}
+
+export function listenOnAllInterfaces(
+  server: Server,
+  port: number,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      server.off("listening", onListening);
+      server.off("error", onError);
+    };
+    const onListening = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    server.once("listening", onListening);
+    server.once("error", onError);
+    try {
+      server.listen(port, "0.0.0.0");
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
 }

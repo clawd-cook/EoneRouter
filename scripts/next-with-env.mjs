@@ -6,7 +6,10 @@ import { resolve } from "node:path";
 import { parseEnv } from "node:util";
 
 import { createOuterServer } from "../lib/eone/forward-proxy.ts";
-import { internalNextArgs } from "../lib/eone/next-listen.ts";
+import {
+  internalNextArgs,
+  listenOnAllInterfaces,
+} from "../lib/eone/next-listen.ts";
 
 const envFile = resolve(process.cwd(), ".env");
 if (existsSync(envFile)) {
@@ -104,7 +107,7 @@ child.on("exit", (code, signal) => {
 
 try {
   await waitForNext(internalPort, readyTimeout);
-  outer.listen(publicPort, "0.0.0.0");
+  await listenOnAllInterfaces(outer, publicPort);
 } catch (error) {
   child.kill();
   throw error;
