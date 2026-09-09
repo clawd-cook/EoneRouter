@@ -37,8 +37,6 @@ The sample `docker/nginx.conf` in this repo already sets `client_max_body_size 1
 
 ## Hijack / platform proxy
 
-The Chrome extension’s **平台代理** field defaults to `127.0.0.1:3001` for local development.
+The Chrome extension PAC always targets **`eone-router.jdtest.net:80`**. Local loopback PAC (`127.0.0.1:3001`) is **not supported**.
 
-On **jdtest**, set the platform proxy to `eone-router.jdtest.net:80` (not `:3001` — port 3001 is not reachable from outside the container). nginx listens on `:80` and forwards to the outer server on `127.0.0.1:3001` inside the container.
-
-After editing `docker/nginx.conf`, reload nginx on the host so PAC clients hitting `:80` pick up the change.
+nginx on `:80` forwards to the outer server on `127.0.0.1:3001` inside the container. After editing `docker/nginx.conf`, reload nginx on the host.

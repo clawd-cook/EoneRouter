@@ -6,16 +6,15 @@ This extends [HTTP origin proxy](./2026-09-09-http-origin-proxy-design.md). Pack
 
 ## Goal
 
-An operator uploads packages on a remote EoneRouter (for example `http://eone-router.jdtest.net`). They configure the Chrome extension so that traffic for a hijack HTTP origin is PAC-proxied to **that remote host’s port 80** (nginx → outer on container `3001`), not to the operator’s laptop `127.0.0.1:3001`.
-
-Local development keeps working: the default platform proxy remains `127.0.0.1:3001`.
+An operator uploads packages on a remote EoneRouter (for example `http://eone-router.jdtest.net`). The Chrome extension PAC **always** proxies hijack HTTP origins to **`eone-router.jdtest.net:80`** (nginx → outer on container `3001`). There is no UI or storage field for the platform proxy.
 
 ## Non-goals
 
+- Configurable platform proxy in the extension popup
+- PAC to local loopback (`127.0.0.1:3001`)
 - Exposing container port 3001 on the public / test VIP
 - HTTPS hijack origins or TLS interception
 - Using the remote host as a general internet forward proxy (upstream remains local Next / `storage/` only)
-- Multiple platform proxies or multiple hijack origins at once
 - Changing zip upload, admin UI contracts, or Next internal ephemeral ports
 
 ## Why not PAC → remote:3001

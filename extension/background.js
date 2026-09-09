@@ -4,7 +4,7 @@ import {
   DNR_RULE_ID,
   DNR_SWIMLANE_RULE_ID,
   DEFAULT_ORIGIN,
-  DEFAULT_PLATFORM_PROXY,
+  PLATFORM_PROXY,
   hostPermissionPattern,
   shouldSkipPac,
 } from "./dnr.mjs";
@@ -28,8 +28,8 @@ async function restoreBrowserProxy() {
   await chrome.storage.local.set({ pacActive: false });
 }
 
-async function applyPac(origin, platformProxy) {
-  if (shouldSkipPac(origin, platformProxy)) {
+async function applyPac(origin) {
+  if (shouldSkipPac(origin)) {
     await restoreBrowserProxy();
     return;
   }
@@ -43,7 +43,7 @@ async function applyPac(origin, platformProxy) {
   await chrome.proxy.settings.set({
     value: {
       mode: "pac_script",
-      pacScript: { data: buildPacScript(origin, platformProxy) },
+      pacScript: { data: buildPacScript(origin) },
     },
     scope: "regular",
   });
@@ -67,10 +67,9 @@ async function rebuild() {
 }
 
 async function rebuildOnce() {
-  const { origin, id, platformProxy } = await chrome.storage.local.get({
+  const { origin, id } = await chrome.storage.local.get({
     origin: DEFAULT_ORIGIN,
     id: "",
-    platformProxy: DEFAULT_PLATFORM_PROXY,
   });
   const hasPermission =
     id &&
@@ -81,8 +80,8 @@ async function rebuildOnce() {
     origin,
     id: id || "(empty)",
     hasPermission: Boolean(hasPermission),
-    skipPac: shouldSkipPac(origin, platformProxy),
-    pacTarget: platformProxy,
+    skipPac: shouldSkipPac(origin),
+    pacTarget: PLATFORM_PROXY,
   });
   const rules = hasPermission ? buildDnrRules({ origin, id }) : [];
   await chrome.declarativeNetRequest.updateDynamicRules({
@@ -91,10 +90,10 @@ async function rebuildOnce() {
   });
   try {
     if (hasPermission) {
-      await applyPac(origin, platformProxy);
+      await applyPac(origin);
       console.info("[eone] pac applied or skipped", {
         origin,
-        skipPac: shouldSkipPac(origin, platformProxy),
+        skipPac: shouldSkipPac(origin),
       });
     } else {
       await restoreBrowserProxy();

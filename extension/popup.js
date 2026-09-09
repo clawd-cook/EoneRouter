@@ -1,15 +1,12 @@
 import {
   DEFAULT_ORIGIN,
-  DEFAULT_PLATFORM_PROXY,
   hijackCollidesWithPlatform,
   normalizeHijackOrigin,
-  normalizePlatformProxy,
   requiredHostPermissions,
 } from "./dnr.mjs";
 
 const originInput = document.querySelector("#origin");
 const idInput = document.querySelector("#id");
-const platformProxyInput = document.querySelector("#platformProxy");
 const saveButton = document.querySelector("#save");
 const clearButton = document.querySelector("#clear");
 const status = document.querySelector("#status");
@@ -27,32 +24,28 @@ async function applyRule() {
 }
 
 async function restore() {
-  const { origin, id, platformProxy } = await chrome.storage.local.get({
+  const { origin, id } = await chrome.storage.local.get({
     origin: DEFAULT_ORIGIN,
     id: "",
-    platformProxy: DEFAULT_PLATFORM_PROXY,
   });
   originInput.value = origin;
   idInput.value = id;
-  platformProxyInput.value = platformProxy;
 }
 
 saveButton.addEventListener("click", async () => {
   const originValue = originInput.value;
   const id = idInput.value.trim();
   let origin;
-  let platformProxy;
 
   try {
     origin = normalizeHijackOrigin(originValue);
-    platformProxy = normalizePlatformProxy(platformProxyInput.value);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error));
     return;
   }
 
-  if (hijackCollidesWithPlatform(origin, platformProxy)) {
-    setStatus("劫持 Origin 不能与平台代理相同");
+  if (hijackCollidesWithPlatform(origin)) {
+    setStatus("劫持 Origin 不能是平台地址");
     return;
   }
 
@@ -67,10 +60,9 @@ saveButton.addEventListener("click", async () => {
       }
     }
 
-    await chrome.storage.local.set({ origin, id, platformProxy });
+    await chrome.storage.local.set({ origin, id });
     await applyRule();
     originInput.value = origin;
-    platformProxyInput.value = platformProxy;
     setStatus("已保存", true);
   } catch (error) {
     setStatus(String(error));

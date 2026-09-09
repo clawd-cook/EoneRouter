@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   DEFAULT_ORIGIN,
-  DEFAULT_PLATFORM_PROXY,
   DNR_RULE_ID,
   DNR_SWIMLANE_RULE_ID,
   EONE_HEADER_NAME,
   LOCAL_PROXY_PORT,
+  PLATFORM_PROXY,
   RESOURCE_TYPES,
   SWIMLANE_HEADER_NAME,
   buildDnrRule,
@@ -16,7 +16,6 @@ import {
   hostPermissionPattern,
   normalizeHijackOrigin,
   normalizeOrigin,
-  normalizePlatformProxy,
   originToRegexFilter,
   pacDecision,
   requiredHostPermissions,
@@ -98,7 +97,8 @@ test("builds X-Eone-Id and Swimlane xmlhttprequest rules", () => {
   assert.deepEqual(swimlaneRule.condition.resourceTypes, ["xmlhttprequest"]);
 });
 
-test("default origin is local platform 3001", () => {
+test("PLATFORM_PROXY is fixed remote :80", () => {
+  assert.equal(PLATFORM_PROXY, "eone-router.jdtest.net:80");
   assert.equal(DEFAULT_ORIGIN, "http://localhost:3001");
   assert.equal(LOCAL_PROXY_PORT, 3001);
 });
@@ -107,37 +107,24 @@ test("normalizeHijackOrigin rejects https", () => {
   assert.throws(() => normalizeHijackOrigin("https://xxx.jd.com"));
 });
 
-test("shouldSkipPac for loopback platform only", () => {
-  assert.equal(shouldSkipPac("http://localhost:3001", "127.0.0.1:3001"), true);
-  assert.equal(shouldSkipPac("http://127.0.0.1:3001/", "127.0.0.1:3001"), true);
-  assert.equal(shouldSkipPac("http://localhost:3001", "LocalHost:3001"), true);
-  assert.equal(shouldSkipPac("http://localhost:3000", "127.0.0.1:3001"), false);
-  assert.equal(shouldSkipPac("http://xxx.jd.com", "127.0.0.1:3001"), false);
-  assert.equal(
-    shouldSkipPac("http://eone-router.jdtest.net", "eone-router.jdtest.net:80"),
-    false,
-  );
-  assert.equal(
-    shouldSkipPac("http://localhost:3001", "eone-router.jdtest.net:80"),
-    false,
-  );
+test("shouldSkipPac only when hijack is the platform", () => {
+  assert.equal(shouldSkipPac("http://eone-router.jdtest.net"), true);
+  assert.equal(shouldSkipPac("http://eone-router.jdtest.net:80/"), true);
+  assert.equal(shouldSkipPac("http://xxx.jd.com"), false);
+  assert.equal(shouldSkipPac("http://localhost:3001"), false);
 });
 
-test("pacDecision uses configured platformProxy", () => {
+test("pacDecision always uses remote PLATFORM_PROXY", () => {
   const origin = "http://xxx.jd.com:8080";
   assert.equal(
-    pacDecision("http://xxx.jd.com:8080/app.js", origin, "eone-router.jdtest.net:80"),
+    pacDecision("http://xxx.jd.com:8080/app.js", origin),
     "PROXY eone-router.jdtest.net:80",
   );
-  assert.equal(
-    pacDecision("http://xxx.jd.com:8080", origin, "127.0.0.1:3001"),
-    "PROXY 127.0.0.1:3001",
-  );
-  assert.equal(pacDecision("http://other.example/", origin, "127.0.0.1:3001"), "DIRECT");
+  assert.equal(pacDecision("http://other.example/", origin), "DIRECT");
 });
 
-test("buildPacScript embeds remote platformProxy", () => {
-  const script = buildPacScript("http://xxx.jd.com", "eone-router.jdtest.net:80");
+test("buildPacScript embeds fixed remote proxy", () => {
+  const script = buildPacScript("http://xxx.jd.com");
   const fn = new Function(`${script}; return FindProxyForURL;`)();
   assert.equal(
     fn("http://xxx.jd.com/a", "xxx.jd.com"),
@@ -146,48 +133,12 @@ test("buildPacScript embeds remote platformProxy", () => {
   assert.equal(fn("http://other.example/", "other.example"), "DIRECT");
 });
 
-test("hijackCollidesWithPlatform detects same endpoint", () => {
+test("hijackCollidesWithPlatform detects platform endpoint", () => {
+  assert.equal(hijackCollidesWithPlatform("http://eone-router.jdtest.net"), true);
   assert.equal(
-    hijackCollidesWithPlatform(
-      "http://eone-router.jdtest.net",
-      "eone-router.jdtest.net:80",
-    ),
+    hijackCollidesWithPlatform("http://EONE-Router.JDTest.net:80"),
     true,
   );
-  assert.equal(
-    hijackCollidesWithPlatform(
-      "http://eone-router.jdtest.net",
-      "EONE-Router.JDTest.net:80",
-    ),
-    true,
-  );
-  assert.equal(
-    hijackCollidesWithPlatform("http://xxx.jd.com", "eone-router.jdtest.net:80"),
-    false,
-  );
-});
-
-test("DEFAULT_PLATFORM_PROXY matches local loopback 3001", () => {
-  assert.equal(DEFAULT_PLATFORM_PROXY, "127.0.0.1:3001");
-});
-
-test("normalizePlatformProxy accepts host:port and http URL", () => {
-  assert.equal(
-    normalizePlatformProxy("eone-router.jdtest.net:80"),
-    "eone-router.jdtest.net:80",
-  );
-  assert.equal(
-    normalizePlatformProxy("http://eone-router.jdtest.net:80"),
-    "eone-router.jdtest.net:80",
-  );
-  assert.equal(normalizePlatformProxy("127.0.0.1:3001"), "127.0.0.1:3001");
-});
-
-test("normalizePlatformProxy rejects bad values", () => {
-  assert.throws(() => normalizePlatformProxy(""));
-  assert.throws(() => normalizePlatformProxy("eone-router.jdtest.net"));
-  assert.throws(() => normalizePlatformProxy("https://eone-router.jdtest.net:80"));
-  assert.throws(() => normalizePlatformProxy("eone-router.jdtest.net:80/path"));
-  assert.throws(() => normalizePlatformProxy("host:abc"));
-  assert.throws(() => normalizePlatformProxy('"evil":80'));
+  assert.equal(hijackCollidesWithPlatform("http://xxx.jd.com"), false);
+  assert.equal(hijackCollidesWithPlatform("http://127.0.0.1:3001"), false);
 });

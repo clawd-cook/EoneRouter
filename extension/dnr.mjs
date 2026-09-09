@@ -2,9 +2,11 @@ export const DNR_RULE_ID = 1;
 export const DNR_SWIMLANE_RULE_ID = 2;
 export const EONE_HEADER_NAME = "X-Eone-Id";
 export const SWIMLANE_HEADER_NAME = "Swimlane";
+/** Outer listen port inside the container (nginx → this). Not a PAC target. */
 export const LOCAL_PROXY_HOST = "127.0.0.1";
 export const LOCAL_PROXY_PORT = 3001;
-export const DEFAULT_PLATFORM_PROXY = `${LOCAL_PROXY_HOST}:${LOCAL_PROXY_PORT}`;
+/** Fixed PAC target. Remote only — local loopback PAC is not supported. */
+export const PLATFORM_PROXY = "eone-router.jdtest.net:80";
 export const DEFAULT_ORIGIN = "http://localhost:3001";
 export const EXTRA_HOST_PERMISSIONS = ["http://*/*", "https://*/*"];
 
@@ -37,95 +39,36 @@ export function normalizeHijackOrigin(origin) {
   return normalized;
 }
 
-export function normalizePlatformProxy(raw) {
-  const trimmed = String(raw ?? "").trim();
-  if (!trimmed) {
-    throw new Error("平台代理不能为空");
-  }
-  let hostPort = trimmed;
-  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) {
-    let url;
-    try {
-      url = new URL(trimmed);
-    } catch {
-      throw new Error("平台代理不合法");
-    }
-    if (url.protocol !== "http:") {
-      throw new Error("平台代理只支持 http");
-    }
-    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
-      throw new Error("平台代理不合法");
-    }
-    let port = url.port;
-    if (!port) {
-      const explicitPort = /^http:\/\/[^/]+:(\d+)/i.exec(trimmed);
-      if (explicitPort) {
-        port = explicitPort[1];
-      }
-    }
-    if (!port) {
-      throw new Error("平台代理必须包含端口");
-    }
-    hostPort = `${url.hostname}:${port}`;
-  }
-  const m = /^([A-Za-z0-9.-]+):(\d+)$/.exec(hostPort);
-  if (!m) {
-    throw new Error("平台代理格式为 host:port");
-  }
-  const port = Number(m[2]);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error("平台代理端口不合法");
-  }
-  return `${m[1].toLowerCase()}:${port}`;
-}
-
-function splitPlatformProxy(platformProxy) {
-  const normalized = normalizePlatformProxy(platformProxy);
-  const idx = normalized.lastIndexOf(":");
-  return {
-    host: normalized.slice(0, idx),
-    port: normalized.slice(idx + 1),
-    value: normalized,
-  };
-}
-
 function originHostPort(originUrl) {
   const u = new URL(normalizeOrigin(originUrl));
   const port = u.port || (u.protocol === "https:" ? "443" : "80");
-  return `${u.hostname}:${port}`;
+  return `${u.hostname.toLowerCase()}:${port}`;
 }
 
-export function hijackCollidesWithPlatform(hijackOrigin, platformProxy) {
-  const hijack = originHostPort(normalizeHijackOrigin(hijackOrigin));
-  const platform = normalizePlatformProxy(platformProxy);
-  return hijack === platform;
+export function hijackCollidesWithPlatform(hijackOrigin) {
+  return originHostPort(normalizeHijackOrigin(hijackOrigin)) === PLATFORM_PROXY;
 }
 
-export function shouldSkipPac(origin, platformProxy = DEFAULT_PLATFORM_PROXY) {
-  const { host, port } = splitPlatformProxy(platformProxy);
-  if (host !== "127.0.0.1" && host !== "localhost") {
+/** Skip PAC when hijack origin is the platform itself (would loop). */
+export function shouldSkipPac(origin) {
+  try {
+    return hijackCollidesWithPlatform(origin);
+  } catch {
     return false;
   }
-  const normalized = normalizeOrigin(origin);
-  return (
-    normalized === `http://localhost:${port}` ||
-    normalized === `http://127.0.0.1:${port}`
-  );
 }
 
-export function pacDecision(url, hijackOrigin, platformProxy = DEFAULT_PLATFORM_PROXY) {
+export function pacDecision(url, hijackOrigin) {
   const origin = normalizeHijackOrigin(hijackOrigin);
-  const { value } = splitPlatformProxy(platformProxy);
   if (url === origin || url.startsWith(`${origin}/`)) {
-    return `PROXY ${value}`;
+    return `PROXY ${PLATFORM_PROXY}`;
   }
   return "DIRECT";
 }
 
-export function buildPacScript(hijackOrigin, platformProxy = DEFAULT_PLATFORM_PROXY) {
+export function buildPacScript(hijackOrigin) {
   const origin = normalizeHijackOrigin(hijackOrigin);
-  const { value } = splitPlatformProxy(platformProxy);
-  const proxyReturn = JSON.stringify(`PROXY ${value}`);
+  const proxyReturn = JSON.stringify(`PROXY ${PLATFORM_PROXY}`);
   return `function FindProxyForURL(url, host) {
   var origin = ${JSON.stringify(origin)};
   if (url === origin || url.indexOf(origin + "/") === 0) {
