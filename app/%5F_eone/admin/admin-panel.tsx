@@ -1,6 +1,7 @@
 "use client";
 
 import { isValidEoneId } from "@/lib/eone/id";
+import { MAX_PACKAGE_BODY_BYTES } from "@/lib/eone/package-http";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -30,6 +31,15 @@ export function AdminPanel({ packages }: { packages: string[] }) {
     const selected = inputRef.current?.files;
     if (!selected || selected.length === 0) {
       setMessage("未选择文件");
+      return;
+    }
+
+    let totalBytes = 0;
+    for (const file of selected) {
+      totalBytes += file.size;
+    }
+    if (totalBytes > MAX_PACKAGE_BODY_BYTES) {
+      setMessage("包太大");
       return;
     }
 
