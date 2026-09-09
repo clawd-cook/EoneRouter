@@ -1,1 +1,0 @@
-var e=[10,20,30,50],t=`/strategy/newLayer/edit`,n=`/strategy/newLayer/list`,r=[{text:`通用弹窗`,value:1},{text:`高优弹窗`,value:2},{text:`爆品活动弹窗`,value:3},{text:`红包弹窗`,value:4}];export{n as i,e as n,t as r,r as t};

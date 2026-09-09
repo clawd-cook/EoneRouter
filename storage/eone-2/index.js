@@ -1,1 +1,0 @@
-window.alert('eone-2');
