@@ -24,7 +24,7 @@ export async function resolve(specifier, context, nextResolve) {
   import.meta.url,
 );
 
-const { listPackages } = await import("./packages.ts");
+const { createPackage, listPackages } = await import("./packages.ts");
 
 function makeRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "eone-pkg-"));
@@ -46,4 +46,76 @@ test("lists only valid eone directories, sorted", () => {
 test("returns empty when storage root is missing", () => {
   const root = path.join(makeRoot(), "missing");
   assert.deepEqual(listPackages(root), []);
+});
+
+test("createPackage writes files with the folder prefix stripped", () => {
+  const root = makeRoot();
+  const result = createPackage(root, "eone-7", [
+    { relativePath: "mysite/index.html", bytes: new TextEncoder().encode("hello") },
+    {
+      relativePath: "mysite/assets/a.css",
+      bytes: new TextEncoder().encode("body{}"),
+    },
+  ]);
+  assert.deepEqual(result, { ok: true, id: "eone-7" });
+  assert.equal(
+    fs.readFileSync(path.join(root, "eone-7", "index.html"), "utf8"),
+    "hello",
+  );
+  assert.equal(
+    fs.readFileSync(path.join(root, "eone-7", "assets", "a.css"), "utf8"),
+    "body{}",
+  );
+  assert.equal(fs.existsSync(path.join(root, "eone-7", "mysite")), false);
+});
+
+test("createPackage allows a tree without index.html", () => {
+  const root = makeRoot();
+  const result = createPackage(root, "eone-noindex", [
+    { relativePath: "site/readme.txt", bytes: new TextEncoder().encode("x") },
+  ]);
+  assert.deepEqual(result, { ok: true, id: "eone-noindex" });
+  assert.equal(fs.existsSync(path.join(root, "eone-noindex", "readme.txt")), true);
+});
+
+test("createPackage rejects illegal id without writing", () => {
+  const root = makeRoot();
+  const result = createPackage(root, "prod-1", [
+    { relativePath: "site/index.html", bytes: new Uint8Array([1]) },
+  ]);
+  assert.deepEqual(result, { ok: false, code: "invalid-id" });
+  assert.deepEqual(fs.readdirSync(root), []);
+});
+
+test("createPackage rejects empty files", () => {
+  const root = makeRoot();
+  assert.deepEqual(createPackage(root, "eone-8", []), {
+    ok: false,
+    code: "empty-files",
+  });
+});
+
+test("createPackage rejects occupied id and leaves original bytes", () => {
+  const root = makeRoot();
+  fs.mkdirSync(path.join(root, "eone-1"));
+  fs.writeFileSync(path.join(root, "eone-1", "index.html"), "keep");
+  const result = createPackage(root, "eone-1", [
+    { relativePath: "site/index.html", bytes: new TextEncoder().encode("new") },
+  ]);
+  assert.deepEqual(result, { ok: false, code: "package-exists" });
+  assert.equal(
+    fs.readFileSync(path.join(root, "eone-1", "index.html"), "utf8"),
+    "keep",
+  );
+});
+
+test("createPackage rejects escape paths and does not create the target", () => {
+  const root = makeRoot();
+  const result = createPackage(root, "eone-9", [
+    { relativePath: "site/foo/../../outside.txt", bytes: new Uint8Array([1]) },
+  ]);
+  assert.deepEqual(result, { ok: false, code: "path-escape" });
+  assert.equal(fs.existsSync(path.join(root, "eone-9")), false);
+  const leftovers = fs.readdirSync(root).filter((n) => n.startsWith(".tmp-"));
+  assert.deepEqual(leftovers, []);
 });
