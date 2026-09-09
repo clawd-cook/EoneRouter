@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-6 py-16 sm:px-10">
@@ -20,6 +22,11 @@ export default function Home() {
           <li>
             把静态文件放到{" "}
             <code className="font-mono">storage/eone-xxxx/</code>
+            ，或打开{" "}
+            <Link className="underline" href="/__eone/admin">
+              管理端
+            </Link>{" "}
+            上传文件夹
           </li>
           <li>打开当前这个地址</li>
         </ol>
