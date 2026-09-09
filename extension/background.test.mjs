@@ -2,21 +2,32 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const listeners = {};
-const updates = [];
+const dnrUpdates = [];
+const proxySets = [];
+const proxyClears = [];
 let granted = false;
-const state = { origin: "http://localhost:3000", id: "eone-1" };
+let proxySettingsValue = { mode: "system" };
+const state = {
+  origin: "http://xxx.jd.com",
+  id: "eone-1",
+  previousProxy: { mode: "system" },
+  pacActive: false,
+};
 
 globalThis.chrome = {
   storage: {
     local: {
-      async get() {
-        return { ...state };
+      async get(defaults = {}) {
+        return { ...defaults, ...state };
+      },
+      async set(value) {
+        Object.assign(state, value);
       },
     },
   },
   permissions: {
     async contains(details) {
-      assert.deepEqual(details, { origins: ["http://localhost:3000/*"] });
+      assert.deepEqual(details, { origins: [`${state.origin}/*`] });
       return granted;
     },
     onAdded: {
@@ -27,7 +38,21 @@ globalThis.chrome = {
   },
   declarativeNetRequest: {
     async updateDynamicRules(update) {
-      updates.push(update);
+      dnrUpdates.push(update);
+    },
+  },
+  proxy: {
+    settings: {
+      async get() {
+        return { value: proxySettingsValue };
+      },
+      async set(update) {
+        proxySets.push(update);
+        proxySettingsValue = update.value;
+      },
+      async clear(update) {
+        proxyClears.push(update);
+      },
     },
   },
   runtime: {
@@ -59,43 +84,113 @@ async function apply() {
 
 test("rebuild removes the rule but does not add it without host permission", async () => {
   granted = false;
-  updates.length = 0;
+  dnrUpdates.length = 0;
+  proxySets.length = 0;
 
   assert.deepEqual(await apply(), { ok: true });
-  assert.deepEqual(updates, [
+  assert.deepEqual(dnrUpdates, [
     { removeRuleIds: [1, 2], addRules: [] },
   ]);
+  assert.equal(proxySets.length, 0);
 });
 
-test("rebuild adds the rule when host permission is granted", async () => {
+test("rebuild adds DNR and PAC when hijacking a real origin", async () => {
   granted = true;
-  updates.length = 0;
+  state.origin = "http://xxx.jd.com";
+  state.id = "eone-1";
+  state.pacActive = false;
+  proxySettingsValue = { mode: "system" };
+  dnrUpdates.length = 0;
+  proxySets.length = 0;
 
   assert.deepEqual(await apply(), { ok: true });
-  assert.equal(updates.length, 1);
-  assert.deepEqual(updates[0].removeRuleIds, [1, 2]);
-  assert.equal(updates[0].addRules.length, 2);
+  assert.equal(dnrUpdates.at(-1).addRules.length, 2);
+  assert.equal(proxySets.length, 1);
+  assert.equal(proxySets[0].scope, "regular");
+  assert.equal(proxySets[0].value.mode, "pac_script");
+  assert.match(proxySets[0].value.pacScript.data, /xxx\.jd\.com/);
+  assert.match(proxySets[0].value.pacScript.data, /PROXY 127\.0\.0\.1:3001/);
+  assert.equal(state.pacActive, true);
+  assert.deepEqual(state.previousProxy, { mode: "system" });
+});
+
+test("skip PAC for local platform origin", async () => {
+  granted = true;
+  state.origin = "http://localhost:3001";
+  state.id = "eone-1";
+  state.pacActive = false;
+  dnrUpdates.length = 0;
+  proxySets.length = 0;
+
+  assert.deepEqual(await apply(), { ok: true });
+  assert.equal(dnrUpdates.at(-1).addRules.length, 2);
   assert.equal(
-    updates[0].addRules[0].action.requestHeaders[0].value,
-    "eone-1",
-  );
-  assert.equal(
-    updates[0].addRules[1].action.requestHeaders[0].header,
-    "Swimlane",
-  );
-  assert.equal(
-    updates[0].addRules[1].action.requestHeaders[0].value,
-    "eone-1",
+    proxySets.some((s) => s.value?.mode === "pac_script"),
+    false,
   );
 });
 
-test("permission additions trigger the same rebuild", async () => {
+test("empty id restores previous proxy", async () => {
+  granted = false;
+  state.origin = "http://xxx.jd.com";
+  state.id = "";
+  state.pacActive = true;
+  state.previousProxy = { mode: "system" };
+  dnrUpdates.length = 0;
+  proxySets.length = 0;
+
+  assert.deepEqual(await apply(), { ok: true });
+  assert.deepEqual(dnrUpdates.at(-1).addRules, []);
+  assert.equal(proxySets.length, 1);
+  assert.deepEqual(proxySets[0].value, { mode: "system" });
+  assert.equal(state.pacActive, false);
+});
+
+test("PAC get() does not overwrite a captured system previousProxy", async () => {
   granted = true;
-  updates.length = 0;
+  state.origin = "http://xxx.jd.com";
+  state.id = "eone-1";
+  state.pacActive = false;
+  state.previousProxy = { mode: "system" };
+  proxySettingsValue = {
+    mode: "pac_script",
+    pacScript: { data: "function FindProxyForURL() { return 'DIRECT'; }" },
+  };
+  dnrUpdates.length = 0;
+  proxySets.length = 0;
 
-  listeners.onAdded({ origins: ["http://localhost:3000/*"] });
-  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(await apply(), { ok: true });
+  assert.deepEqual(state.previousProxy, { mode: "system" });
+});
 
-  assert.equal(updates.length, 1);
-  assert.equal(updates[0].addRules.length, 2);
+test("overlapping applies leave previousProxy as system", async () => {
+  granted = true;
+  state.origin = "http://xxx.jd.com";
+  state.id = "eone-1";
+  state.pacActive = false;
+  state.previousProxy = { mode: "system" };
+  proxySettingsValue = { mode: "system" };
+  dnrUpdates.length = 0;
+  proxySets.length = 0;
+
+  const originalGet = chrome.proxy.settings.get;
+  let getCalls = 0;
+  chrome.proxy.settings.get = async () => {
+    getCalls += 1;
+    if (getCalls === 1) {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+    return { value: proxySettingsValue };
+  };
+
+  try {
+    const first = apply();
+    listeners.onAdded();
+    const second = apply();
+    await Promise.all([first, second]);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.deepEqual(state.previousProxy, { mode: "system" });
+  } finally {
+    chrome.proxy.settings.get = originalGet;
+  }
 });

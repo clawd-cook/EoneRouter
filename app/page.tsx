@@ -16,8 +16,11 @@ export default function Home() {
             加载未打包的 Chrome 插件
           </li>
           <li>
-            填写 <code className="font-mono">eone-xxxx</code> 和平台 Origin
-            （默认 <code className="font-mono">http://localhost:3000</code>）
+            填写要劫持的站点 Origin（http，例如{" "}
+            <code className="font-mono">http://xxx.jd.com</code>
+            ）和 <code className="font-mono">eone-xxxx</code>
+            。本机平台固定为{" "}
+            <code className="font-mono">http://localhost:3001</code>
           </li>
           <li>
             把静态文件放到{" "}
@@ -29,6 +32,9 @@ export default function Home() {
             上传文件夹
           </li>
           <li>打开当前这个地址</li>
+          <li>
+            劫持真实站点时请先保持本页对应的本地进程在跑；清空插件标识后浏览器会重新访问真实站点
+          </li>
         </ol>
       </div>
     </main>

@@ -1,17 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  DEFAULT_ORIGIN,
   DNR_RULE_ID,
   DNR_SWIMLANE_RULE_ID,
   EONE_HEADER_NAME,
+  LOCAL_PROXY_PORT,
   RESOURCE_TYPES,
   SWIMLANE_HEADER_NAME,
   buildDnrRule,
   buildDnrRules,
+  buildPacScript,
   hostPermissionPattern,
+  normalizeHijackOrigin,
   normalizeOrigin,
   originToRegexFilter,
+  pacDecision,
   requiredHostPermissions,
+  shouldSkipPac,
 } from "./dnr.mjs";
 
 test("normalizeOrigin strips path and trailing slash", () => {
@@ -87,4 +93,38 @@ test("builds X-Eone-Id and Swimlane xmlhttprequest rules", () => {
     "jdcleaning-man-web-test.web.jdtest.net",
   ]);
   assert.deepEqual(swimlaneRule.condition.resourceTypes, ["xmlhttprequest"]);
+});
+
+test("default origin is local platform 3001", () => {
+  assert.equal(DEFAULT_ORIGIN, "http://localhost:3001");
+  assert.equal(LOCAL_PROXY_PORT, 3001);
+});
+
+test("normalizeHijackOrigin rejects https", () => {
+  assert.throws(() => normalizeHijackOrigin("https://xxx.jd.com"));
+});
+
+test("shouldSkipPac for platform loopback only", () => {
+  assert.equal(shouldSkipPac("http://localhost:3001"), true);
+  assert.equal(shouldSkipPac("http://127.0.0.1:3001/"), true);
+  assert.equal(shouldSkipPac("http://xxx.jd.com"), false);
+  assert.equal(shouldSkipPac("http://localhost:3000"), false);
+});
+
+test("pacDecision matches origin and subpaths including port", () => {
+  const origin = "http://xxx.jd.com:8080";
+  assert.equal(pacDecision("http://xxx.jd.com:8080", origin), "PROXY 127.0.0.1:3001");
+  assert.equal(
+    pacDecision("http://xxx.jd.com:8080/app.js", origin),
+    "PROXY 127.0.0.1:3001",
+  );
+  assert.equal(pacDecision("http://other.example/", origin), "DIRECT");
+});
+
+test("buildPacScript is evaluable and matches pacDecision", () => {
+  const origin = "http://xxx.jd.com";
+  const script = buildPacScript(origin);
+  const fn = new Function(`${script}; return FindProxyForURL;`)();
+  assert.equal(fn("http://xxx.jd.com/a", "xxx.jd.com"), "PROXY 127.0.0.1:3001");
+  assert.equal(fn("http://other.example/", "other.example"), "DIRECT");
 });

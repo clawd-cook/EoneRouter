@@ -97,3 +97,14 @@ test("invalid origin fails before storage is written", async () => {
 
   assert.deepEqual(calls, []);
 });
+
+test("https hijack origin is rejected before storage", async () => {
+  calls.length = 0;
+  elements.get("#origin").value = "https://xxx.jd.com";
+  elements.get("#id").value = "eone-1";
+
+  await elements.get("#save").listeners.click();
+
+  assert.deepEqual(calls, []);
+  assert.equal(elements.get("#status").textContent, "劫持 Origin 必须是 http");
+});
