@@ -2,14 +2,15 @@
 
 import { isValidEoneId } from "@/lib/eone/id";
 import { MAX_PACKAGE_BODY_BYTES } from "@/lib/eone/package-http";
+import { App, Button, Card, Form, Input, Table, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 export function AdminPanel({ packages }: { packages: string[] }) {
   const router = useRouter();
+  const { message, modal } = App.useApp();
+  const [form] = Form.useForm<{ id: string }>();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [id, setId] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   function bindDirectoryInput(node: HTMLInputElement | null) {
@@ -18,67 +19,48 @@ export function AdminPanel({ packages }: { packages: string[] }) {
     }
     node.setAttribute("webkitdirectory", "");
     node.setAttribute("directory", "");
+    inputRef.current = node;
   }
 
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage(null);
-    const trimmed = id.trim();
-    if (!isValidEoneId(trimmed)) {
-      setMessage("标识不合法");
-      return;
-    }
+  async function onFinish(values: { id: string }) {
+    const trimmed = values.id.trim();
     const selected = inputRef.current?.files;
     if (!selected || selected.length === 0) {
-      setMessage("未选择文件");
       return;
     }
 
-    let totalBytes = 0;
+    const formData = new FormData();
+    formData.append("id", trimmed);
     for (const file of selected) {
-      totalBytes += file.size;
-    }
-    if (totalBytes > MAX_PACKAGE_BODY_BYTES) {
-      setMessage("包太大");
-      return;
-    }
-
-    const form = new FormData();
-    form.append("id", trimmed);
-    for (const file of selected) {
-      form.append("file", file);
-      form.append("path", file.webkitRelativePath);
+      formData.append("file", file);
+      formData.append("path", file.webkitRelativePath);
     }
 
     setPending(true);
     try {
       const response = await fetch("/__eone/admin/packages", {
         method: "POST",
-        body: form,
+        body: formData,
       });
       const body = (await response.json()) as { id?: string; error?: string };
       if (!response.ok) {
-        setMessage(body.error ?? "写入失败");
+        message.error(body.error ?? "写入失败");
         return;
       }
-      setId("");
+      form.resetFields();
       if (inputRef.current) {
         inputRef.current.value = "";
       }
-      setMessage(`已创建 ${body.id}`);
+      message.success(`已创建 ${body.id}`);
       router.refresh();
     } catch {
-      setMessage("写入失败");
+      message.error("写入失败");
     } finally {
       setPending(false);
     }
   }
 
-  async function onDelete(packageId: string) {
-    if (!window.confirm(`确定删除 ${packageId}？`)) {
-      return;
-    }
-    setMessage(null);
+  async function deletePackage(packageId: string) {
     setPending(true);
     try {
       const response = await fetch(
@@ -87,93 +69,111 @@ export function AdminPanel({ packages }: { packages: string[] }) {
       );
       const body = (await response.json()) as { error?: string };
       if (!response.ok) {
-        setMessage(body.error ?? "写入失败");
+        message.error(body.error ?? "写入失败");
         return;
       }
-      setMessage(`已删除 ${packageId}`);
+      message.success(`已删除 ${packageId}`);
       router.refresh();
     } catch {
-      setMessage("写入失败");
+      message.error("写入失败");
     } finally {
       setPending(false);
     }
   }
 
+  function onDelete(packageId: string) {
+    modal.confirm({
+      title: `确定删除 ${packageId}？`,
+      okText: "确定",
+      cancelText: "取消",
+      onOk: () => deletePackage(packageId),
+    });
+  }
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-6 py-16 sm:px-10">
-      <div className="rounded-3xl border border-black/10 bg-white p-8 shadow-sm dark:border-white/15 dark:bg-zinc-950 sm:p-12">
-        <p className="mb-3 font-mono text-sm font-semibold tracking-widest text-zinc-500 uppercase dark:text-zinc-400">
-          EoneRouter
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          管理静态包
-        </h1>
-        <p className="mt-4 text-zinc-600 dark:text-zinc-400">
-          填写标识并选择本地文件夹。标识已被占用时不会覆盖。
-        </p>
-
-        <form className="mt-8 space-y-4" onSubmit={onSubmit}>
-          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            标识
-            <input
-              className="mt-2 w-full rounded-xl border border-black/10 bg-transparent px-3 py-2 font-mono dark:border-white/15"
-              value={id}
-              onChange={(e) => setId(e.target.value)}
-              placeholder="eone-xxxx"
-              autoComplete="off"
-            />
-          </label>
-          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            文件夹
-            <input
-              ref={(node) => {
-                inputRef.current = node;
-                bindDirectoryInput(node);
-              }}
-              className="mt-2 w-full text-sm"
-              type="file"
-              multiple
-            />
-          </label>
-          <button
-            className="rounded-xl bg-zinc-900 px-4 py-2 text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-            type="submit"
-            disabled={pending}
-          >
+    <Card>
+      <Typography.Title level={3} style={{ marginTop: 0 }}>
+        管理静态包
+      </Typography.Title>
+      <Typography.Paragraph type="secondary">
+        填写标识并选择本地文件夹。标识已被占用时不会覆盖。
+      </Typography.Paragraph>
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={onFinish}
+        disabled={pending}
+      >
+        <Form.Item
+          label="标识"
+          name="id"
+          rules={[
+            {
+              validator: async (_, value: string | undefined) => {
+                if (!isValidEoneId((value ?? "").trim())) {
+                  throw new Error("标识不合法");
+                }
+              },
+            },
+          ]}
+        >
+          <Input placeholder="eone-xxxx" autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          label="文件夹"
+          name="folder"
+          rules={[
+            {
+              validator: async () => {
+                const selected = inputRef.current?.files;
+                if (!selected || selected.length === 0) {
+                  throw new Error("未选择文件");
+                }
+                let totalBytes = 0;
+                for (const file of selected) {
+                  totalBytes += file.size;
+                }
+                if (totalBytes > MAX_PACKAGE_BODY_BYTES) {
+                  throw new Error("包太大");
+                }
+              },
+            },
+          ]}
+        >
+          <input ref={bindDirectoryInput} type="file" multiple />
+        </Form.Item>
+        <Form.Item>
+          <Button type="primary" htmlType="submit" loading={pending}>
             上传
-          </button>
-        </form>
-
-        {message ? (
-          <p className="mt-4 text-sm text-zinc-700 dark:text-zinc-300">{message}</p>
-        ) : null}
-
-        <h2 className="mt-10 text-lg font-semibold">已有标识</h2>
-        {packages.length === 0 ? (
-          <p className="mt-3 text-zinc-600 dark:text-zinc-400">暂无静态包</p>
-        ) : (
-          <ul className="mt-4 divide-y divide-black/10 dark:divide-white/15">
-            {packages.map((packageId) => (
-              <li
-                key={packageId}
-                className="flex items-center justify-between py-3"
+          </Button>
+        </Form.Item>
+      </Form>
+      <Typography.Title level={4}>已有标识</Typography.Title>
+      <Table
+        rowKey="id"
+        pagination={false}
+        dataSource={packages.map((id) => ({ id }))}
+        locale={{ emptyText: "暂无静态包" }}
+        columns={[
+          { title: "标识", dataIndex: "id" },
+          {
+            title: "操作",
+            key: "actions",
+            render: (_: unknown, row: { id: string }) => (
+              <Button
+                type="link"
+                danger
+                disabled={pending}
+                onClick={() => {
+                  onDelete(row.id);
+                }}
               >
-                <code className="font-mono">{packageId}</code>
-                <button
-                  className="text-sm text-red-700 dark:text-red-400"
-                  type="button"
-                  disabled={pending}
-                  onClick={() => {
-                    void onDelete(packageId);
-                  }}
-                >
-                  删除
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </main>
+                删除
+              </Button>
+            ),
+          },
+        ]}
+      />
+    </Card>
   );
 }
