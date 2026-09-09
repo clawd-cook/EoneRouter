@@ -79,28 +79,56 @@ export function normalizePlatformProxy(raw) {
   return `${m[1]}:${port}`;
 }
 
-export function shouldSkipPac(origin) {
+function splitPlatformProxy(platformProxy) {
+  const normalized = normalizePlatformProxy(platformProxy);
+  const idx = normalized.lastIndexOf(":");
+  return {
+    host: normalized.slice(0, idx),
+    port: normalized.slice(idx + 1),
+    value: normalized,
+  };
+}
+
+function originHostPort(originUrl) {
+  const u = new URL(normalizeOrigin(originUrl));
+  const port = u.port || (u.protocol === "https:" ? "443" : "80");
+  return `${u.hostname}:${port}`;
+}
+
+export function hijackCollidesWithPlatform(hijackOrigin, platformProxy) {
+  const hijack = originHostPort(normalizeHijackOrigin(hijackOrigin));
+  const platform = normalizePlatformProxy(platformProxy);
+  return hijack === platform;
+}
+
+export function shouldSkipPac(origin, platformProxy = DEFAULT_PLATFORM_PROXY) {
+  const { host, port } = splitPlatformProxy(platformProxy);
+  if (host !== "127.0.0.1" && host !== "localhost") {
+    return false;
+  }
   const normalized = normalizeOrigin(origin);
   return (
-    normalized === "http://localhost:3001" ||
-    normalized === "http://127.0.0.1:3001"
+    normalized === `http://localhost:${port}` ||
+    normalized === `http://127.0.0.1:${port}`
   );
 }
 
-export function pacDecision(url, hijackOrigin) {
+export function pacDecision(url, hijackOrigin, platformProxy = DEFAULT_PLATFORM_PROXY) {
   const origin = normalizeHijackOrigin(hijackOrigin);
+  const { value } = splitPlatformProxy(platformProxy);
   if (url === origin || url.startsWith(`${origin}/`)) {
-    return `PROXY ${LOCAL_PROXY_HOST}:${LOCAL_PROXY_PORT}`;
+    return `PROXY ${value}`;
   }
   return "DIRECT";
 }
 
-export function buildPacScript(hijackOrigin) {
+export function buildPacScript(hijackOrigin, platformProxy = DEFAULT_PLATFORM_PROXY) {
   const origin = normalizeHijackOrigin(hijackOrigin);
+  const { value } = splitPlatformProxy(platformProxy);
   return `function FindProxyForURL(url, host) {
   var origin = ${JSON.stringify(origin)};
   if (url === origin || url.indexOf(origin + "/") === 0) {
-    return "PROXY ${LOCAL_PROXY_HOST}:${LOCAL_PROXY_PORT}";
+    return "PROXY ${value}";
   }
   return "DIRECT";
 }

@@ -12,6 +12,7 @@ import {
   buildDnrRule,
   buildDnrRules,
   buildPacScript,
+  hijackCollidesWithPlatform,
   hostPermissionPattern,
   normalizeHijackOrigin,
   normalizeOrigin,
@@ -106,29 +107,54 @@ test("normalizeHijackOrigin rejects https", () => {
   assert.throws(() => normalizeHijackOrigin("https://xxx.jd.com"));
 });
 
-test("shouldSkipPac for platform loopback only", () => {
-  assert.equal(shouldSkipPac("http://localhost:3001"), true);
-  assert.equal(shouldSkipPac("http://127.0.0.1:3001/"), true);
-  assert.equal(shouldSkipPac("http://xxx.jd.com"), false);
-  assert.equal(shouldSkipPac("http://localhost:3000"), false);
+test("shouldSkipPac for loopback platform only", () => {
+  assert.equal(shouldSkipPac("http://localhost:3001", "127.0.0.1:3001"), true);
+  assert.equal(shouldSkipPac("http://127.0.0.1:3001/", "127.0.0.1:3001"), true);
+  assert.equal(shouldSkipPac("http://xxx.jd.com", "127.0.0.1:3001"), false);
+  assert.equal(
+    shouldSkipPac("http://eone-router.jdtest.net", "eone-router.jdtest.net:80"),
+    false,
+  );
+  assert.equal(
+    shouldSkipPac("http://localhost:3001", "eone-router.jdtest.net:80"),
+    false,
+  );
 });
 
-test("pacDecision matches origin and subpaths including port", () => {
+test("pacDecision uses configured platformProxy", () => {
   const origin = "http://xxx.jd.com:8080";
-  assert.equal(pacDecision("http://xxx.jd.com:8080", origin), "PROXY 127.0.0.1:3001");
   assert.equal(
-    pacDecision("http://xxx.jd.com:8080/app.js", origin),
+    pacDecision("http://xxx.jd.com:8080/app.js", origin, "eone-router.jdtest.net:80"),
+    "PROXY eone-router.jdtest.net:80",
+  );
+  assert.equal(
+    pacDecision("http://xxx.jd.com:8080", origin, "127.0.0.1:3001"),
     "PROXY 127.0.0.1:3001",
   );
-  assert.equal(pacDecision("http://other.example/", origin), "DIRECT");
+  assert.equal(pacDecision("http://other.example/", origin, "127.0.0.1:3001"), "DIRECT");
 });
 
-test("buildPacScript is evaluable and matches pacDecision", () => {
-  const origin = "http://xxx.jd.com";
-  const script = buildPacScript(origin);
+test("buildPacScript embeds remote platformProxy", () => {
+  const script = buildPacScript("http://xxx.jd.com", "eone-router.jdtest.net:80");
   const fn = new Function(`${script}; return FindProxyForURL;`)();
-  assert.equal(fn("http://xxx.jd.com/a", "xxx.jd.com"), "PROXY 127.0.0.1:3001");
-  assert.equal(fn("http://other.example/", "other.example"), "DIRECT");
+  assert.equal(
+    fn("http://xxx.jd.com/a", "xxx.jd.com"),
+    "PROXY eone-router.jdtest.net:80",
+  );
+});
+
+test("hijackCollidesWithPlatform detects same endpoint", () => {
+  assert.equal(
+    hijackCollidesWithPlatform(
+      "http://eone-router.jdtest.net",
+      "eone-router.jdtest.net:80",
+    ),
+    true,
+  );
+  assert.equal(
+    hijackCollidesWithPlatform("http://xxx.jd.com", "eone-router.jdtest.net:80"),
+    false,
+  );
 });
 
 test("DEFAULT_PLATFORM_PROXY matches local loopback 3001", () => {
