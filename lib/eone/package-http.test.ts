@@ -19,6 +19,10 @@ test("maps codes to the spec statuses and Chinese messages", () => {
     status: 400,
     error: "相对路径不合法",
   });
+  assert.deepEqual(packageErrorBody("invalid-zip"), {
+    status: 400,
+    error: "压缩包不合法",
+  });
   assert.deepEqual(packageErrorBody("package-exists"), {
     status: 409,
     error: "标识已被占用",

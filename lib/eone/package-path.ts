@@ -9,12 +9,9 @@ export function resolveUploadRelativePath(raw: string): string | null {
   }
 
   const segments = normalized.split("/");
-  if (segments.length < 2) {
-    return null;
-  }
-  if (segments.some((s) => s === "" || s === "." || s === "..")) {
+  if (segments.length < 1 || segments.some((s) => s === "" || s === "." || s === "..")) {
     return null;
   }
 
-  return segments.slice(1).join("/");
+  return segments.join("/");
 }

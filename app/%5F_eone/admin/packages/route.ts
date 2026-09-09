@@ -1,4 +1,9 @@
-import { isBodyTooLarge, packageErrorBody } from "@/lib/eone/package-http";
+import { extractZipFiles } from "@/lib/eone/extract-zip";
+import {
+  isBodyTooLarge,
+  MAX_PACKAGE_BODY_BYTES,
+  packageErrorBody,
+} from "@/lib/eone/package-http";
 import { createPackage, listPackages } from "@/lib/eone/packages";
 import { getStorageRoot } from "@/lib/eone/storage-root";
 import { NextResponse } from "next/server";
@@ -16,6 +21,10 @@ export async function GET() {
   return NextResponse.json({ packages });
 }
 
+function looksLikeZipName(name: string): boolean {
+  return name.toLowerCase().endsWith(".zip");
+}
+
 export async function POST(request: Request) {
   if (isBodyTooLarge(request.headers.get("content-length"))) {
     return NextResponse.json({ error: "包太大" }, { status: 413 });
@@ -29,26 +38,28 @@ export async function POST(request: Request) {
   }
 
   const id = String(form.get("id") ?? "");
-  const fileParts = form.getAll("file");
-  const pathParts = form.getAll("path");
-  if (fileParts.length === 0 || fileParts.length !== pathParts.length) {
+  const part = form.get("file");
+  if (!(part instanceof File)) {
     return jsonError("empty-files");
   }
-
-  const files = [];
-  for (let i = 0; i < fileParts.length; i++) {
-    const part = fileParts[i];
-    const rel = pathParts[i];
-    if (!(part instanceof File) || typeof rel !== "string") {
-      return jsonError("empty-files");
-    }
-    files.push({
-      relativePath: rel,
-      bytes: new Uint8Array(await part.arrayBuffer()),
-    });
+  if (!looksLikeZipName(part.name)) {
+    return jsonError("invalid-zip");
   }
 
-  const result = createPackage(getStorageRoot(), id, files);
+  const zipBytes = new Uint8Array(await part.arrayBuffer());
+  if (zipBytes.byteLength > MAX_PACKAGE_BODY_BYTES) {
+    return NextResponse.json({ error: "包太大" }, { status: 413 });
+  }
+
+  const extracted = extractZipFiles(zipBytes, MAX_PACKAGE_BODY_BYTES);
+  if (!extracted.ok) {
+    if (extracted.code === "too-large") {
+      return NextResponse.json({ error: "包太大" }, { status: 413 });
+    }
+    return jsonError(extracted.code);
+  }
+
+  const result = createPackage(getStorageRoot(), id, extracted.files);
   if (!result.ok) {
     return jsonError(result.code);
   }

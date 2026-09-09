@@ -13,28 +13,16 @@ export function AdminPanel({ packages }: { packages: string[] }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
 
-  function bindDirectoryInput(node: HTMLInputElement | null) {
-    if (!node) {
-      return;
-    }
-    node.setAttribute("webkitdirectory", "");
-    node.setAttribute("directory", "");
-    inputRef.current = node;
-  }
-
   async function onFinish(values: { id: string }) {
     const trimmed = values.id.trim();
-    const selected = inputRef.current?.files;
-    if (!selected || selected.length === 0) {
+    const selected = inputRef.current?.files?.[0];
+    if (!selected) {
       return;
     }
 
     const formData = new FormData();
     formData.append("id", trimmed);
-    for (const file of selected) {
-      formData.append("file", file);
-      formData.append("path", file.webkitRelativePath);
-    }
+    formData.append("file", selected);
 
     setPending(true);
     try {
@@ -96,7 +84,7 @@ export function AdminPanel({ packages }: { packages: string[] }) {
         管理静态包
       </Typography.Title>
       <Typography.Paragraph type="secondary">
-        填写标识并选择本地文件夹。标识已被占用时不会覆盖。
+        填写标识并选择 zip 压缩包（根目录即站点根）。标识已被占用时不会覆盖。
       </Typography.Paragraph>
       <Form
         form={form}
@@ -120,27 +108,26 @@ export function AdminPanel({ packages }: { packages: string[] }) {
           <Input placeholder="eone-xxxx" autoComplete="off" />
         </Form.Item>
         <Form.Item
-          label="文件夹"
-          name="folder"
+          label="压缩包"
+          name="archive"
           rules={[
             {
               validator: async () => {
-                const selected = inputRef.current?.files;
-                if (!selected || selected.length === 0) {
+                const selected = inputRef.current?.files?.[0];
+                if (!selected) {
                   throw new Error("未选择文件");
                 }
-                let totalBytes = 0;
-                for (const file of selected) {
-                  totalBytes += file.size;
+                if (!selected.name.toLowerCase().endsWith(".zip")) {
+                  throw new Error("压缩包不合法");
                 }
-                if (totalBytes > MAX_PACKAGE_BODY_BYTES) {
+                if (selected.size > MAX_PACKAGE_BODY_BYTES) {
                   throw new Error("包太大");
                 }
               },
             },
           ]}
         >
-          <input ref={bindDirectoryInput} type="file" multiple />
+          <input ref={inputRef} type="file" accept=".zip,application/zip" />
         </Form.Item>
         <Form.Item>
           <Button type="primary" htmlType="submit" loading={pending}>

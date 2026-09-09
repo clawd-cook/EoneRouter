@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EoneRouter
 
-## Getting Started
+Next.js App Router app that serves static packages under `storage/` and exposes an admin panel at `/__eone/admin`.
 
-First, run the development server:
+## Runtime
+
+Use **nvm Node.js v24.20.0** and **pnpm** only (see `.node-version` and `AGENTS.md`).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+export NVM_DIR="$HOME/.nvm"
+. "/opt/homebrew/opt/nvm/nvm.sh"
+nvm use 24.20.0
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Admin package upload
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Operators upload a **`.zip`** whose **root is the site root** (for example `index.html` and `assets/...` at the top of the archive). The server extracts it into `storage/<id>/`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Limits:
 
-## Learn More
+- HTTP body and uncompressed total: **100 MiB**
+- Over that → HTTP 413 `包太大`
 
-To learn more about Next.js, take a look at the following resources:
+### Reverse proxy body size
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+If uploads fail with **413 Request Entity Too Large** before the app responds (common on nginx and similar gateways), raise the proxy limit to at least **100 MiB**.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Nginx example:
 
-## Deploy on Vercel
+```nginx
+client_max_body_size 100m;
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The sample `docker/nginx.conf` in this repo does not set `client_max_body_size`, so nginx’s default (**1m**) will reject larger zip uploads. Set the directive on the jdtest / production gateway (or in that sample config) to match the app ceiling.

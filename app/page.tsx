@@ -43,7 +43,7 @@ export default function Home() {
                 把静态文件放到{" "}
                 <Typography.Text code>storage/eone-xxxx/</Typography.Text>
                 ，或打开{" "}
-                <Link href="/__eone/admin">管理端</Link> 上传文件夹
+                <Link href="/__eone/admin">管理端</Link> 上传 zip 压缩包
               </>
             ),
           },
