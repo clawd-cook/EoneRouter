@@ -68,7 +68,7 @@ export function normalizePlatformProxy(raw) {
     }
     hostPort = `${url.hostname}:${port}`;
   }
-  const m = /^([^:\/\s]+):(\d+)$/.exec(hostPort);
+  const m = /^([A-Za-z0-9.-]+):(\d+)$/.exec(hostPort);
   if (!m) {
     throw new Error("平台代理格式为 host:port");
   }
@@ -76,7 +76,7 @@ export function normalizePlatformProxy(raw) {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error("平台代理端口不合法");
   }
-  return `${m[1]}:${port}`;
+  return `${m[1].toLowerCase()}:${port}`;
 }
 
 function splitPlatformProxy(platformProxy) {
@@ -125,10 +125,11 @@ export function pacDecision(url, hijackOrigin, platformProxy = DEFAULT_PLATFORM_
 export function buildPacScript(hijackOrigin, platformProxy = DEFAULT_PLATFORM_PROXY) {
   const origin = normalizeHijackOrigin(hijackOrigin);
   const { value } = splitPlatformProxy(platformProxy);
+  const proxyReturn = JSON.stringify(`PROXY ${value}`);
   return `function FindProxyForURL(url, host) {
   var origin = ${JSON.stringify(origin)};
   if (url === origin || url.indexOf(origin + "/") === 0) {
-    return "PROXY ${value}";
+    return ${proxyReturn};
   }
   return "DIRECT";
 }
