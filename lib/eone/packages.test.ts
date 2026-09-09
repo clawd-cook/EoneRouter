@@ -24,7 +24,7 @@ export async function resolve(specifier, context, nextResolve) {
   import.meta.url,
 );
 
-const { createPackage, listPackages } = await import("./packages.ts");
+const { createPackage, deletePackage, listPackages } = await import("./packages.ts");
 
 function makeRoot(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "eone-pkg-"));
@@ -158,4 +158,36 @@ test("createPackage rejects escape paths and does not create the target", () => 
   assert.equal(fs.existsSync(path.join(root, "eone-9")), false);
   const leftovers = fs.readdirSync(root).filter((n) => n.startsWith(".tmp-"));
   assert.deepEqual(leftovers, []);
+});
+
+test("deletePackage removes only that directory", () => {
+  const root = makeRoot();
+  createPackage(root, "eone-a", [
+    { relativePath: "s/index.html", bytes: new TextEncoder().encode("a") },
+  ]);
+  createPackage(root, "eone-b", [
+    { relativePath: "s/index.html", bytes: new TextEncoder().encode("b") },
+  ]);
+  assert.deepEqual(deletePackage(root, "eone-a"), { ok: true, id: "eone-a" });
+  assert.equal(fs.existsSync(path.join(root, "eone-a")), false);
+  assert.equal(
+    fs.readFileSync(path.join(root, "eone-b", "index.html"), "utf8"),
+    "b",
+  );
+});
+
+test("deletePackage rejects illegal id", () => {
+  const root = makeRoot();
+  assert.deepEqual(deletePackage(root, "prod-1"), {
+    ok: false,
+    code: "invalid-id",
+  });
+});
+
+test("deletePackage returns not-found when missing", () => {
+  const root = makeRoot();
+  assert.deepEqual(deletePackage(root, "eone-missing"), {
+    ok: false,
+    code: "not-found",
+  });
 });

@@ -110,3 +110,46 @@ export function createPackage(
     return { ok: false, code: "write-failed" };
   }
 }
+
+export type DeletePackageResult =
+  | { ok: true; id: string }
+  | { ok: false; code: "invalid-id" | "not-found" | "write-failed" };
+
+export function deletePackage(
+  storageRoot: string,
+  id: string,
+): DeletePackageResult {
+  if (!isValidEoneId(id)) {
+    return { ok: false, code: "invalid-id" };
+  }
+
+  const packageDir = path.join(storageRoot, id);
+  let st: fs.Stats;
+  try {
+    st = fs.lstatSync(packageDir);
+  } catch {
+    return { ok: false, code: "not-found" };
+  }
+  if (!st.isDirectory()) {
+    return { ok: false, code: "not-found" };
+  }
+
+  let realRoot: string;
+  let realPackage: string;
+  try {
+    realRoot = fs.realpathSync(storageRoot);
+    realPackage = fs.realpathSync(packageDir);
+  } catch {
+    return { ok: false, code: "not-found" };
+  }
+  if (realPackage === realRoot || !isInside(realRoot, realPackage)) {
+    return { ok: false, code: "write-failed" };
+  }
+
+  try {
+    fs.rmSync(packageDir, { recursive: true, force: false });
+    return { ok: true, id };
+  } catch {
+    return { ok: false, code: "write-failed" };
+  }
+}
