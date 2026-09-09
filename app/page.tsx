@@ -52,12 +52,6 @@ export default function Home() {
             title: "打开当前地址",
             content: "打开当前这个地址",
           },
-          {
-            status: "wait",
-            title: "保持进程",
-            content:
-              "劫持真实站点时请先保持本页对应的本地进程在跑；清空插件标识后浏览器会重新访问真实站点",
-          },
         ]}
       />
       <Button type="primary" href="/__eone/admin">
