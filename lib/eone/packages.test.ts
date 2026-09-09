@@ -109,6 +109,46 @@ test("createPackage rejects occupied id and leaves original bytes", () => {
   );
 });
 
+test("createPackage does not replace an empty destination created during staging", () => {
+  const root = makeRoot();
+  const dest = path.join(root, "eone-race");
+  const originalWriteFileSync = fs.writeFileSync;
+  fs.writeFileSync = function (...args) {
+    originalWriteFileSync(...args);
+    if (String(args[0]).includes(`${path.sep}.tmp-`)) {
+      fs.mkdirSync(dest);
+    }
+  } as typeof fs.writeFileSync;
+
+  try {
+    const result = createPackage(root, "eone-race", [
+      { relativePath: "site/index.html", bytes: new TextEncoder().encode("new") },
+    ]);
+    assert.deepEqual(result, { ok: false, code: "package-exists" });
+    assert.deepEqual(fs.readdirSync(dest), []);
+    assert.deepEqual(
+      fs.readdirSync(root).filter((name) => name.startsWith(".tmp-")),
+      [],
+    );
+  } finally {
+    fs.writeFileSync = originalWriteFileSync;
+  }
+});
+
+test("createPackage returns write-failed when storage root is a file", () => {
+  const parent = makeRoot();
+  const root = path.join(parent, "storage-file");
+  fs.writeFileSync(root, "occupied");
+
+  assert.deepEqual(
+    createPackage(root, "eone-10", [
+      { relativePath: "site/index.html", bytes: new Uint8Array([1]) },
+    ]),
+    { ok: false, code: "write-failed" },
+  );
+  assert.equal(fs.readFileSync(root, "utf8"), "occupied");
+});
+
 test("createPackage rejects escape paths and does not create the target", () => {
   const root = makeRoot();
   const result = createPackage(root, "eone-9", [

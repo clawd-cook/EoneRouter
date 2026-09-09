@@ -74,16 +74,18 @@ export function createPackage(
     resolved.push({ relative, bytes: file.bytes });
   }
 
-  fs.mkdirSync(storageRoot, { recursive: true });
   const dest = path.join(storageRoot, id);
-  if (fs.existsSync(dest)) {
-    return { ok: false, code: "package-exists" };
-  }
-
   const tmpDir = path.join(storageRoot, `.tmp-${randomUUID()}`);
-  let renaming = false;
+  let tmpCreated = false;
+  let publishing = false;
   try {
+    fs.mkdirSync(storageRoot, { recursive: true });
+    if (fs.existsSync(dest)) {
+      return { ok: false, code: "package-exists" };
+    }
+
     fs.mkdirSync(tmpDir);
+    tmpCreated = true;
     const realTmp = fs.realpathSync(tmpDir);
     for (const file of resolved) {
       const target = path.resolve(realTmp, file.relative);
@@ -94,12 +96,15 @@ export function createPackage(
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, file.bytes);
     }
-    renaming = true;
+    publishing = true;
+    fs.mkdirSync(dest);
     fs.renameSync(tmpDir, dest);
     return { ok: true, id };
-  } catch {
-    removeDir(tmpDir);
-    if (renaming && fs.existsSync(dest)) {
+  } catch (err) {
+    if (tmpCreated) {
+      removeDir(tmpDir);
+    }
+    if (publishing && (err as NodeJS.ErrnoException).code === "EEXIST") {
       return { ok: false, code: "package-exists" };
     }
     return { ok: false, code: "write-failed" };
