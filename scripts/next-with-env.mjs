@@ -9,6 +9,7 @@ import { createOuterServer } from "../lib/eone/forward-proxy.ts";
 import {
   internalNextArgs,
   listenOnAllInterfaces,
+  stopChildProcess,
 } from "../lib/eone/next-listen.ts";
 
 const envFile = resolve(process.cwd(), ".env");
@@ -109,6 +110,7 @@ try {
   await waitForNext(internalPort, readyTimeout);
   await listenOnAllInterfaces(outer, publicPort);
 } catch (error) {
-  child.kill();
+  child.removeAllListeners("exit");
+  await stopChildProcess(child);
   throw error;
 }

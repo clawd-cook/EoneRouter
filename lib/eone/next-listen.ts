@@ -27,6 +27,42 @@ export function internalNextArgs(
   ];
 }
 
+export type KillableChild = {
+  kill: (signal?: NodeJS.Signals) => boolean;
+  once: (event: "exit", listener: () => void) => unknown;
+  exitCode: number | null;
+  signalCode: NodeJS.Signals | null;
+};
+
+export async function stopChildProcess(
+  child: KillableChild,
+  options: { gracefulMs?: number } = {},
+): Promise<void> {
+  const gracefulMs = options.gracefulMs ?? 5_000;
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+    }, gracefulMs);
+    child.once("exit", done);
+    if (child.exitCode !== null || child.signalCode !== null) {
+      done();
+      return;
+    }
+    child.kill();
+  });
+}
+
 export function listenOnAllInterfaces(
   server: Server,
   port: number,

@@ -35,7 +35,9 @@ async function applyPac(origin) {
   const { pacActive } = await chrome.storage.local.get({ pacActive: false });
   if (!pacActive) {
     const current = await chrome.proxy.settings.get({});
-    await chrome.storage.local.set({ previousProxy: current.value });
+    if (current?.value?.mode !== "pac_script") {
+      await chrome.storage.local.set({ previousProxy: current.value });
+    }
   }
   await chrome.proxy.settings.set({
     value: {
@@ -47,7 +49,23 @@ async function applyPac(origin) {
   await chrome.storage.local.set({ pacActive: true });
 }
 
+let rebuildMutex = Promise.resolve();
+
 async function rebuild() {
+  const previous = rebuildMutex;
+  let release;
+  rebuildMutex = new Promise((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    await rebuildOnce();
+  } finally {
+    release();
+  }
+}
+
+async function rebuildOnce() {
   const { origin, id } = await chrome.storage.local.get({
     origin: DEFAULT_ORIGIN,
     id: "",

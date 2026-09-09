@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import net from "node:net";
 import { test } from "node:test";
+import { spawn } from "node:child_process";
 import {
   internalNextArgs,
   listenOnAllInterfaces,
+  stopChildProcess,
   stripPortFlags,
 } from "./next-listen.ts";
 
@@ -43,4 +45,27 @@ test("rejects when the public port cannot be bound", async () => {
       blocker.close((error) => (error ? reject(error) : resolve()));
     });
   }
+});
+
+test("stopChildProcess waits for the child to exit after kill", async () => {
+  const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30_000)"]);
+  await stopChildProcess(child, { gracefulMs: 2000 });
+  assert.ok(child.signalCode !== null || child.exitCode !== null);
+});
+
+test("stopChildProcess SIGKILLs a child that ignores SIGTERM", async () => {
+  const child = spawn(process.execPath, [
+    "-e",
+    "process.on('SIGTERM', () => {}); process.stdout.write('ready'); setInterval(() => {}, 1000);",
+  ]);
+  await new Promise<void>((resolve, reject) => {
+    assert.ok(child.stdout);
+    child.stdout.once("data", () => resolve());
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      reject(new Error(`child exited before ready (${code}/${signal})`));
+    });
+  });
+  await stopChildProcess(child, { gracefulMs: 200 });
+  assert.equal(child.signalCode, "SIGKILL");
 });

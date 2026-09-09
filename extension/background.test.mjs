@@ -6,6 +6,7 @@ const dnrUpdates = [];
 const proxySets = [];
 const proxyClears = [];
 let granted = false;
+let proxySettingsValue = { mode: "system" };
 const state = {
   origin: "http://xxx.jd.com",
   id: "eone-1",
@@ -43,10 +44,11 @@ globalThis.chrome = {
   proxy: {
     settings: {
       async get() {
-        return { value: { mode: "system" } };
+        return { value: proxySettingsValue };
       },
       async set(update) {
         proxySets.push(update);
+        proxySettingsValue = update.value;
       },
       async clear(update) {
         proxyClears.push(update);
@@ -97,6 +99,7 @@ test("rebuild adds DNR and PAC when hijacking a real origin", async () => {
   state.origin = "http://xxx.jd.com";
   state.id = "eone-1";
   state.pacActive = false;
+  proxySettingsValue = { mode: "system" };
   dnrUpdates.length = 0;
   proxySets.length = 0;
 
@@ -141,4 +144,53 @@ test("empty id restores previous proxy", async () => {
   assert.equal(proxySets.length, 1);
   assert.deepEqual(proxySets[0].value, { mode: "system" });
   assert.equal(state.pacActive, false);
+});
+
+test("PAC get() does not overwrite a captured system previousProxy", async () => {
+  granted = true;
+  state.origin = "http://xxx.jd.com";
+  state.id = "eone-1";
+  state.pacActive = false;
+  state.previousProxy = { mode: "system" };
+  proxySettingsValue = {
+    mode: "pac_script",
+    pacScript: { data: "function FindProxyForURL() { return 'DIRECT'; }" },
+  };
+  dnrUpdates.length = 0;
+  proxySets.length = 0;
+
+  assert.deepEqual(await apply(), { ok: true });
+  assert.deepEqual(state.previousProxy, { mode: "system" });
+});
+
+test("overlapping applies leave previousProxy as system", async () => {
+  granted = true;
+  state.origin = "http://xxx.jd.com";
+  state.id = "eone-1";
+  state.pacActive = false;
+  state.previousProxy = { mode: "system" };
+  proxySettingsValue = { mode: "system" };
+  dnrUpdates.length = 0;
+  proxySets.length = 0;
+
+  const originalGet = chrome.proxy.settings.get;
+  let getCalls = 0;
+  chrome.proxy.settings.get = async () => {
+    getCalls += 1;
+    if (getCalls === 1) {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+    return { value: proxySettingsValue };
+  };
+
+  try {
+    const first = apply();
+    listeners.onAdded();
+    const second = apply();
+    await Promise.all([first, second]);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.deepEqual(state.previousProxy, { mode: "system" });
+  } finally {
+    chrome.proxy.settings.get = originalGet;
+  }
 });
